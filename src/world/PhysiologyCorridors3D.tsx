@@ -11,9 +11,9 @@ import {
   RING_RADII,
 } from '../data/mandalaData';
 import { useWorldStore } from '../store/useWorldStore';
+import { useSceneConfigStore } from '../store/useSceneConfigStore';
 
 const SECTOR_ANGLE = (Math.PI * 2) / 64; // 5.625°
-const WALL_HEIGHT = 6.2;
 
 /**
  * 走廊內左右懸浮半透明填色切換箭頭
@@ -303,6 +303,8 @@ function CorridorStations({
  */
 export function PhysiologyCorridors3D() {
   const theme = useWorldStore((s) => s.theme);
+  const config = useSceneConfigStore((s) => s.config);
+  const wallHeight = config.corridorWallHeight;
   const isLight = theme === 'light';
   const stage = useWorldStore((s) => s.stage);
   const chart = useWorldStore((s) => s.chart);
@@ -428,24 +430,24 @@ export function PhysiologyCorridors3D() {
               key={idx}
               position={[
                 Math.cos(wallAngle) * corridorMidR,
-                WALL_HEIGHT / 2,
+                wallHeight / 2,
                 Math.sin(wallAngle) * corridorMidR,
               ]}
               rotation={[0, -wallAngle, 0]}
             >
               <mesh>
-                <planeGeometry args={[corridorLength, WALL_HEIGHT]} />
+                <planeGeometry args={[corridorLength, wallHeight]} />
                 <meshStandardMaterial
                   color={isLight ? '#0284c7' : '#7dd3fc'}
                   emissive="#0284c7"
                   emissiveIntensity={isLight ? 0.2 : 0.45}
                   transparent
-                  opacity={isLight ? 0.18 : 0.2}
+                  opacity={config.corridorWallOpacity}
                   side={THREE.DoubleSide}
                   depthWrite={false}
                 />
               </mesh>
-              <mesh position={[0, WALL_HEIGHT / 2, 0]}>
+              <mesh position={[0, wallHeight / 2, 0]}>
                 <boxGeometry args={[corridorLength, 0.12, 0.12]} />
                 <meshBasicMaterial color={isLight ? '#0284c7' : '#7dd3fc'} transparent opacity={0.85} />
               </mesh>

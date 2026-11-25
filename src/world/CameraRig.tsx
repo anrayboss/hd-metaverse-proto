@@ -5,6 +5,7 @@ import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
 import { getGateWorldPosition, MANDALA_GATES } from '../data/mandalaData';
 import { useWorldStore } from '../store/useWorldStore';
+import { useSceneConfigStore } from '../store/useSceneConfigStore';
 
 export function CameraRig() {
   const { camera } = useThree();
@@ -19,6 +20,7 @@ export function CameraRig() {
   const activeCorridorIndex = useWorldStore((s) => s.activeCorridorIndex);
   const corridorRadius = useWorldStore((s) => s.corridorRadius);
   const corridorDirection = useWorldStore((s) => s.corridorDirection);
+  const config = useSceneConfigStore((s) => s.config);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -92,7 +94,7 @@ export function CameraRig() {
       case 'intro':
         // 正上方純粹鳥瞰視角（完全對應海報第二張圖）
         return {
-          desiredPos: new THREE.Vector3(0, 232, 0.1),
+          desiredPos: new THREE.Vector3(0, config.birdEyeHeight, 0.1),
           desiredTarget: new THREE.Vector3(0, 0, 0),
         };
       case 'red-sun':
@@ -110,11 +112,11 @@ export function CameraRig() {
       default:
         // 鳥瞰大屋根全觀視角
         return {
-          desiredPos: new THREE.Vector3(0, 225, 0.1),
+          desiredPos: new THREE.Vector3(0, config.birdEyeHeight - 7, 0.1),
           desiredTarget: new THREE.Vector3(0, 0, 0),
         };
     }
-  }, [stage, chart.redSun.gate, cameraFocusTarget]);
+  }, [stage, chart.redSun.gate, cameraFocusTarget, config.birdEyeHeight]);
 
   const forward = useMemo(() => new THREE.Vector3(), []);
   const right = useMemo(() => new THREE.Vector3(), []);
@@ -150,7 +152,7 @@ export function CameraRig() {
       }
 
       const a = smoothCorridorAngle.current;
-      corridorCamPos.set(Math.cos(a) * corridorRadius, 2.75, Math.sin(a) * corridorRadius);
+      corridorCamPos.set(Math.cos(a) * corridorRadius, config.corridorCameraY, Math.sin(a) * corridorRadius);
 
       // In：朝內依序看 象限→數字→中心→神格→星座→八卦→密碼子→生理→人體圖
       // Out：朝外完全相反順序呈現

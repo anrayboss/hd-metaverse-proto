@@ -11,6 +11,7 @@ import {
   RING_RADII,
 } from '../data/mandalaData';
 import { useWorldStore } from '../store/useWorldStore';
+import { useSceneConfigStore } from '../store/useSceneConfigStore';
 
 interface GateHexagramProps {
   gate: GateInfo;
@@ -18,6 +19,8 @@ interface GateHexagramProps {
   isBlackSun: boolean;
   isSelected: boolean;
   isLight: boolean;
+  hexagramY: number;
+  gateNumberY: number;
   centerInfo: CenterInfo;
   onEnterCorridor: (gateNumber: number) => void;
 }
@@ -60,6 +63,8 @@ function GateHexagram({
   isBlackSun,
   isSelected,
   isLight,
+  hexagramY,
+  gateNumberY,
   centerInfo,
   onEnterCorridor,
 }: GateHexagramProps) {
@@ -100,7 +105,7 @@ function GateHexagram({
     <group>
       {/* 外環第 2 層：易經 64 卦象（全填滿點擊區 + Billboard 永遠正對鏡頭） */}
       <group position={hexPos}>
-        <Billboard position={[0, 1.75, 0]} follow>
+        <Billboard position={[0, hexagramY, 0]} follow>
           <mesh
             onClick={(e) => {
               e.stopPropagation();
@@ -183,7 +188,7 @@ function GateHexagram({
         </Billboard>
 
         {/* 卦象上方立體閘門數字（Billboard 永遠正對鏡頭） */}
-        <Billboard position={[0, 4.3, 0]} follow>
+        <Billboard position={[0, gateNumberY, 0]} follow>
           <Text
             fontSize={isSpecial ? 1.85 : hovered || isSelected ? 1.65 : 1.35}
             color={isSpecial ? accentColor : hovered || isSelected ? '#0284c7' : isLight ? '#0f172a' : '#f8fafc'}
@@ -250,6 +255,7 @@ export function MandalaRing3D() {
   const selected = useWorldStore((s) => s.selected);
   const enterCorridorByGate = useWorldStore((s) => s.enterCorridorByGate);
   const theme = useWorldStore((s) => s.theme);
+  const config = useSceneConfigStore((s) => s.config);
   const isLight = theme === 'light';
 
   const centerMap = useMemo(() => Object.fromEntries(CENTERS.map((c) => [c.id, c])), []);
@@ -260,7 +266,7 @@ export function MandalaRing3D() {
     outer.absarc(0, 0, RING_RADII.hexagram + 3.5, 0, Math.PI * 2, false);
 
     const geom = new THREE.ExtrudeGeometry(outer, {
-      depth: 2.6,
+      depth: config.floorDepth,
       bevelEnabled: true,
       bevelThickness: 0.2,
       bevelSize: 0.2,
@@ -269,7 +275,7 @@ export function MandalaRing3D() {
     });
     geom.rotateX(Math.PI / 2);
     return geom;
-  }, []);
+  }, [config.floorDepth]);
 
   // 10 層同心圓清晰分界線（對齊海報鳥瞰視角）
   const concentricRings = useMemo(
@@ -340,8 +346,8 @@ export function MandalaRing3D() {
 
   return (
     <group>
-      {/* 大阪世博大屋根扁平厚實心圓盤底盤（降低至 y = -0.35 避免切到上方物件） */}
-      <mesh geometry={grandRingGeometry} position={[0, -0.35, 0]} receiveShadow>
+      {/* 大阪世博大屋根扁平厚實心圓盤底盤（可用 Studio 即時微調高度 Y） */}
+      <mesh geometry={grandRingGeometry} position={[0, config.floorY, 0]} receiveShadow>
         <meshStandardMaterial
           color={isLight ? '#ffffff' : '#0c1324'}
           metalness={isLight ? 0.05 : 0.45}
@@ -399,6 +405,8 @@ export function MandalaRing3D() {
           isBlackSun={chart.blackSun.gate === gate.gate}
           isSelected={selected?.type === 'gate' && selected.gate.gate === gate.gate}
           isLight={isLight}
+          hexagramY={config.hexagramY}
+          gateNumberY={config.gateNumberY}
           centerInfo={centerMap[gate.centerId]}
           onEnterCorridor={(gateNum) => enterCorridorByGate(gateNum, 'in', 85)}
         />

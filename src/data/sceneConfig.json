@@ -1,0 +1,13 @@
+{
+  "floorY": -0.35,
+  "floorDepth": 2.6,
+  "hexagramY": 1.75,
+  "gateNumberY": 4.3,
+  "corridorWallHeight": 6.2,
+  "corridorWallOpacity": 0.18,
+  "corridorCameraY": 2.75,
+  "bodyGraphFlatY": 0.12,
+  "ambientIntensity": 1.25,
+  "fogDensity": 0.0012,
+  "birdEyeHeight": 232
+}

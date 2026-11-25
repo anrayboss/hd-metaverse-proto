@@ -12,6 +12,7 @@ import {
   GATE_BY_NUMBER,
 } from '../data/mandalaData';
 import { useWorldStore } from '../store/useWorldStore';
+import { useSceneConfigStore } from '../store/useSceneConfigStore';
 
 const BODYGRAPH_GLB_URL = '/models/bodygraph.glb';
 
@@ -434,6 +435,7 @@ function CenterNode({
 export function BodyGraph3D() {
   const monopoleRef = useRef<THREE.Mesh>(null);
   const theme = useWorldStore((s) => s.theme);
+  const config = useSceneConfigStore((s) => s.config);
   const isLight = theme === 'light';
   const chart = useWorldStore((s) => s.chart);
   const selected = useWorldStore((s) => s.selected);
@@ -456,18 +458,20 @@ export function BodyGraph3D() {
 
   return (
     <group>
-      <Suspense fallback={null}>
-        <SplineAtriumBodyGraph
-          definedCenters={chart.definedCenters}
-          activeGates={chart.activeGates}
-          isLight={isLight}
-          onSelectCenter={(c, worldPos) => selectCenter(c.id, worldPos)}
-          onSelectGate={(gateNum, worldPos) => {
-            const info = GATE_BY_NUMBER[gateNum];
-            if (info) selectGate(info, worldPos);
-          }}
-        />
-      </Suspense>
+      <group position={[0, config.bodyGraphFlatY, 0]}>
+        <Suspense fallback={null}>
+          <SplineAtriumBodyGraph
+            definedCenters={chart.definedCenters}
+            activeGates={chart.activeGates}
+            isLight={isLight}
+            onSelectCenter={(c, worldPos) => selectCenter(c.id, worldPos)}
+            onSelectGate={(gateNum, worldPos) => {
+              const info = GATE_BY_NUMBER[gateNum];
+              if (info) selectGate(info, worldPos);
+            }}
+          />
+        </Suspense>
+      </group>
 
       {showVertical3D && (
         <group>
