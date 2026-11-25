@@ -1,0 +1,386 @@
+import { useState } from 'react';
+import { CENTERS, MANDALA_GATES, QUADRANT_META, RING_RADII } from '../data/mandalaData';
+import { JourneyStage, useWorldStore } from '../store/useWorldStore';
+
+const STAGE_STEPS: Array<{ id: JourneyStage; label: string }> = [
+  { id: 'intro', label: '0. 鳥瞰入口' },
+  { id: 'red-sun', label: '1. 紅太陽卦象' },
+  { id: 'corridor', label: '2. 閘門走廊 (In)' },
+  { id: 'bodygraph', label: '3. 人體圖中庭' },
+  { id: 'black-sun', label: '4. 黑太陽走廊 (Out)' },
+  { id: 'free-roam', label: '5. 鳥瞰自由探索' },
+];
+
+const STATIONS_IN = [
+  { r: RING_RADII.quadrant, label: '象限' },
+  { r: RING_RADII.gateNumber, label: '數字' },
+  { r: RING_RADII.centerBlock, label: '中心' },
+  { r: RING_RADII.godhead, label: '神格' },
+  { r: RING_RADII.zodiac, label: '星座' },
+  { r: RING_RADII.trigram, label: '八卦' },
+  { r: RING_RADII.codonToken, label: '密碼子環' },
+  { r: RING_RADII.physiology, label: '生理對應' },
+];
+
+export function HudOverlay() {
+  const theme = useWorldStore((s) => s.theme);
+  const toggleTheme = useWorldStore((s) => s.toggleTheme);
+  const stage = useWorldStore((s) => s.stage);
+  const chart = useWorldStore((s) => s.chart);
+  const selected = useWorldStore((s) => s.selected);
+  const showReceiptModal = useWorldStore((s) => s.showReceiptModal);
+  const activeCorridorIndex = useWorldStore((s) => s.activeCorridorIndex);
+  const corridorRadius = useWorldStore((s) => s.corridorRadius);
+  const corridorDirection = useWorldStore((s) => s.corridorDirection);
+  const setStage = useWorldStore((s) => s.setStage);
+  const nextStage = useWorldStore((s) => s.nextStage);
+  const prevStage = useWorldStore((s) => s.prevStage);
+  const updateBirthData = useWorldStore((s) => s.updateBirthData);
+  const enterCorridorByGate = useWorldStore((s) => s.enterCorridorByGate);
+  const switchAdjacentCorridor = useWorldStore((s) => s.switchAdjacentCorridor);
+  const setCorridorRadius = useWorldStore((s) => s.setCorridorRadius);
+  const toggleCorridorDirection = useWorldStore((s) => s.toggleCorridorDirection);
+  const clearSelection = useWorldStore((s) => s.clearSelection);
+  const setShowReceiptModal = useWorldStore((s) => s.setShowReceiptModal);
+
+  const [birthDate, setBirthDate] = useState(chart.birthDate);
+  const [birthTime, setBirthTime] = useState(chart.birthTime);
+
+  const handleEnterUniverse = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateBirthData(birthDate, birthTime);
+    setStage('red-sun');
+  };
+
+  const selectedCenter =
+    selected?.type === 'center' ? CENTERS.find((c) => c.id === selected.centerId) : null;
+  const activeCorridorGate = MANDALA_GATES[activeCorridorIndex];
+  const inCorridor = stage === 'corridor' || stage === 'black-sun';
+
+  const orderedStations = corridorDirection === 'in' ? STATIONS_IN : [...STATIONS_IN].reverse();
+  const closestStation = STATIONS_IN.reduce((best, cur) =>
+    Math.abs(cur.r - corridorRadius) < Math.abs(best.r - corridorRadius) ? cur : best
+  );
+
+  const forwardSign = corridorDirection === 'in' ? -1 : 1;
+  const leftStep: -1 | 1 = corridorDirection === 'in' ? -1 : 1;
+
+  return (
+    <div className="hud-root">
+      <header className="hud-header">
+        <div className="hud-brand">
+          <span className="hud-brand__dot" />
+          <div>
+            <div className="hud-brand__title">人類設計宇宙｜1/64 閘門走廊</div>
+            <div className="hud-brand__sub">鳥瞰曼陀羅 · 點擊任意卦象進入 8 站立體走廊</div>
+          </div>
+        </div>
+
+        <nav className="stage-pills">
+          {STAGE_STEPS.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              className={`stage-pill ${stage === s.id ? 'stage-pill--active' : ''}`}
+              onClick={() => setStage(s.id)}
+            >
+              {s.label}
+            </button>
+          ))}
+        </nav>
+
+        <div className="header-actions">
+          <button type="button" className="btn-ghost" onClick={toggleTheme}>
+            {theme === 'light' ? '🌙 深色' : '☀️ 淺色'}
+          </button>
+          <button
+            type="button"
+            className="btn-outline"
+            onClick={() => setShowReceiptModal(true)}
+          >
+            本命能量座標卡
+          </button>
+        </div>
+      </header>
+
+      {/* Stage 0：鳥瞰出生入口 */}
+      {stage === 'intro' && (
+        <section className="intro-card" style={{ alignSelf: 'flex-start', margin: 'auto 0 0 0' }}>
+          <h1>把自主權還給你</h1>
+          <p className="intro-card__desc">
+            輸入出生資料或直接點擊畫面任一卦象進入其 1/64 曼陀羅立體走廊。
+          </p>
+
+          <form onSubmit={handleEnterUniverse} className="intro-form">
+            <div className="form-row">
+              <label>
+                <span>出生日期</span>
+                <input
+                  type="date"
+                  value={birthDate}
+                  onChange={(e) => {
+                    setBirthDate(e.target.value);
+                    updateBirthData(e.target.value, birthTime);
+                  }}
+                  required
+                />
+              </label>
+              <label>
+                <span>出生時間（UTC+8）</span>
+                <input
+                  type="time"
+                  value={birthTime}
+                  onChange={(e) => {
+                    setBirthTime(e.target.value);
+                    updateBirthData(birthDate, e.target.value);
+                  }}
+                  required
+                />
+              </label>
+            </div>
+
+            <div className="live-preview">
+              <div className="preview-item preview-item--red">
+                <span className="preview-label">紅太陽入口（-88°）</span>
+                <strong>
+                  Gate {chart.redSun.gate}.{chart.redSun.line} · {chart.redSun.gateInfo.ichingName}
+                </strong>
+              </div>
+              <div className="preview-item preview-item--black">
+                <span className="preview-label">黑太陽出口</span>
+                <strong>
+                  Gate {chart.blackSun.gate}.{chart.blackSun.line} ·{' '}
+                  {chart.blackSun.gateInfo.ichingName}
+                </strong>
+              </div>
+            </div>
+
+            <div className="guide-actions">
+              <button type="submit" className="btn-primary" style={{ flex: 1 }}>
+                紅太陽起點進入 →
+              </button>
+              <button
+                type="button"
+                className="btn-outline"
+                onClick={() => enterCorridorByGate(55, 'in', 85)}
+              >
+                直入 Gate 55 走廊
+              </button>
+            </div>
+          </form>
+        </section>
+      )}
+
+      {/* Stages 1 & 3 */}
+      {(stage === 'red-sun' || stage === 'bodygraph') && (
+        <section className="guide-panel">
+          {stage === 'red-sun' && (
+            <>
+              <span className="guide-badge guide-badge--red">STEP 1 · 紅太陽卦象</span>
+              <h2>
+                Gate {chart.redSun.gate}.{chart.redSun.line}（{chart.redSun.gateInfo.ichingName}）
+              </h2>
+              <p>點擊卦象或按下一步，沿 1/64 走廊由外向內穿越 8 層立體物件進入人體圖。</p>
+            </>
+          )}
+
+          {stage === 'bodygraph' && (
+            <>
+              <span className="guide-badge guide-badge--cyan">STEP 3 · 人體圖中庭</span>
+              <h2>中央九大中心與磁單極</h2>
+              <p>下一步將轉向你的黑太陽閘門（Gate {chart.blackSun.gate}），由內向外走完反向順序走出曼陀羅。</p>
+            </>
+          )}
+
+          <div className="guide-actions">
+            <button type="button" className="btn-ghost" onClick={prevStage}>
+              ← 上一步
+            </button>
+            <button type="button" className="btn-primary" onClick={nextStage}>
+              {stage === 'red-sun' ? '進入紅太陽走廊 (In) →' : '從黑太陽走廊走出 (Out) →'}
+            </button>
+          </div>
+        </section>
+      )}
+
+      {/* Stages 2 & 4：完整 1/64 閘門走廊（In / Out 雙向） */}
+      {inCorridor && (
+        <section className="guide-panel">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span className="guide-badge guide-badge--cyan">
+              Gate {activeCorridorGate.gate} 走廊｜{corridorDirection === 'in' ? 'IN（外 → 人體圖）' : 'OUT（人體圖 → 外）'}
+            </span>
+            <button type="button" className="btn-ghost" style={{ padding: '4px 10px', fontSize: 12 }} onClick={toggleCorridorDirection}>
+              🔄 切換 {corridorDirection === 'in' ? 'Out 反向' : 'In 進人體'} (R)
+            </button>
+          </div>
+
+          <h2>
+            Gate {activeCorridorGate.gate} · {activeCorridorGate.ichingName}
+          </h2>
+
+          {/* 8 站進度條（In 正序 / Out 逆序） */}
+          <div className="station-strip">
+            {orderedStations.map((st) => (
+              <button
+                key={st.label}
+                type="button"
+                className={`station-chip ${closestStation.label === st.label ? 'station-chip--active' : ''}`}
+                onClick={() => setCorridorRadius(st.r + (corridorDirection === 'in' ? 4.5 : -4.5))}
+              >
+                {st.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="corridor-pad" style={{ marginTop: 10 }}>
+            <button type="button" className="btn-ghost" onClick={() => switchAdjacentCorridor(leftStep)}>
+              ← 左鄰閘門
+            </button>
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => setCorridorRadius(corridorRadius + forwardSign * 6)}
+            >
+              ↑ 前進 (W)
+            </button>
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => setCorridorRadius(corridorRadius - forwardSign * 6)}
+            >
+              ↓ 後退 (S)
+            </button>
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => switchAdjacentCorridor((leftStep * -1) as -1 | 1)}
+            >
+              右鄰閘門 →
+            </button>
+          </div>
+
+          <div className="guide-actions" style={{ marginTop: 10 }}>
+            <button type="button" className="btn-ghost" onClick={() => setStage('free-roam')}>
+              回鳥瞰視角
+            </button>
+            <button type="button" className="btn-primary" onClick={nextStage}>
+              {stage === 'corridor' ? '進入中央人體圖 →' : '完成並切回鳥瞰探索 →'}
+            </button>
+          </div>
+        </section>
+      )}
+
+      {stage === 'free-roam' && (
+        <div className="controls-hint">
+          <span>
+            <strong>鳥瞰自由探索</strong>｜點擊任一<strong>卦象或 1/64 扇形空間</strong>即進入該閘門走廊
+          </span>
+          <span>
+            <code>W A S D</code> 移動 · <code>Q / E</code> 升降 · 滑鼠拖曳／滾輪縮放
+          </span>
+        </div>
+      )}
+
+      {selected && (
+        <aside className="inspector-card">
+          <button type="button" className="inspector-close" onClick={clearSelection}>
+            ✕
+          </button>
+
+          {selected.type === 'gate' && (
+            <>
+              <span
+                className="guide-badge"
+                style={{
+                  borderColor: QUADRANT_META[selected.gate.quadrant].color,
+                  color: QUADRANT_META[selected.gate.quadrant].color,
+                }}
+              >
+                {QUADRANT_META[selected.gate.quadrant].name}
+              </span>
+              <h3>
+                Gate {selected.gate.gate} · {selected.gate.ichingName}
+              </h3>
+
+              <div className="layers-grid">
+                <div><span>1. 象限</span><strong>{QUADRANT_META[selected.gate.quadrant].shortName}</strong></div>
+                <div><span>2. 數字</span><strong>{selected.gate.gate}</strong></div>
+                <div><span>3. 中心</span><strong>{CENTERS.find((c) => c.id === selected.gate.centerId)?.name}</strong></div>
+                <div><span>4. 神格</span><strong>{selected.gate.godhead}</strong></div>
+                <div><span>5. 星座</span><strong>{selected.gate.zodiac}</strong></div>
+                <div><span>6. 八卦</span><strong>{selected.gate.trigram}</strong></div>
+                <div><span>7. 密碼子環</span><strong>{selected.gate.codonRing}</strong></div>
+                <div><span>8. 生理對應</span><strong>{selected.gate.physiology}</strong></div>
+              </div>
+
+              {!inCorridor && (
+                <button
+                  type="button"
+                  className="btn-primary"
+                  style={{ width: '100%' }}
+                  onClick={() => enterCorridorByGate(selected.gate.gate, 'in', 85)}
+                >
+                  進入 Gate {selected.gate.gate} 走廊 (In) →
+                </button>
+              )}
+            </>
+          )}
+
+          {selectedCenter && (
+            <>
+              <span className="guide-badge guide-badge--cyan">
+                {chart.definedCenters.includes(selectedCenter.id) ? '已定義中心' : '空白中心'}
+              </span>
+              <h3>
+                {selectedCenter.name} ({selectedCenter.enName})
+              </h3>
+              <p className="inspector-lead">{selectedCenter.theme}</p>
+              <div className="inspector-meta">
+                包含閘門：{selectedCenter.gates.map((g) => `#${g}`).join(' ')}
+              </div>
+            </>
+          )}
+        </aside>
+      )}
+
+      {showReceiptModal && (
+        <div className="modal-backdrop" onClick={() => setShowReceiptModal(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="inspector-close" onClick={() => setShowReceiptModal(false)}>
+              ✕
+            </button>
+            <span className="guide-badge guide-badge--gold">本命能量座標卡</span>
+            <h2>
+              {chart.birthDate} {chart.birthTime}
+            </h2>
+            <div className="receipt-grid">
+              <div className="receipt-box receipt-box--red">
+                <div className="receipt-label">紅太陽入口</div>
+                <div className="receipt-val">
+                  Gate {chart.redSun.gate}.{chart.redSun.line} · {chart.redSun.gateInfo.ichingName}
+                </div>
+                <div className="receipt-sub">生理：{chart.redSun.gateInfo.physiology}</div>
+              </div>
+              <div className="receipt-box receipt-box--black">
+                <div className="receipt-label">黑太陽出口</div>
+                <div className="receipt-val">
+                  Gate {chart.blackSun.gate}.{chart.blackSun.line} · {chart.blackSun.gateInfo.ichingName}
+                </div>
+                <div className="receipt-sub">生理：{chart.blackSun.gateInfo.physiology}</div>
+              </div>
+            </div>
+            <div className="cta-group">
+              <a className="btn-primary" href="https://hdlifestyle.online/self-study-manual/" target="_blank" rel="noreferrer">
+                人類設計自學手冊 →
+              </a>
+              <a className="btn-outline" href="https://human-design-alive.onrender.com/" target="_blank" rel="noreferrer">
+                Human Design Alive
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
