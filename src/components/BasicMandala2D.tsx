@@ -30,8 +30,8 @@ const QUADRANT_NUM_COLOR: Record<QuadrantId, string> = {
 
 const CX = 500;
 const CY = 500;
-const R_HEX_CENTER = 470; // 最外圈易經卦象（無任何包覆線條）
-const R_LINE_BAND_OUTER = 434; // 數字到卦象之間的 6 爻細環外緣
+const R_HEX_CENTER = 452; // 最外圈易經卦象（與爻線填色距離縮小一半，更貼近曼陀羅，無任何包覆線條）
+const R_LINE_BAND_OUTER = 434; // 數字到卦象之間的 6 爻細環外緣（不畫外圈包覆線，保留通透感）
 const R_LINE_BAND_INNER = 420; // 數字圈外緣 / 6 爻細環內緣
 const R_GATE_INNER = 374; // 數字圈內緣 / 星座圈外緣
 const R_ZODIAC_INNER = 324; // 星座圈內緣
@@ -264,8 +264,7 @@ export function BasicMandala2D() {
           );
         })}
 
-        {/* 同心圓邊線（最外圈只到 6 爻細環，不包覆易經卦象） */}
-        <circle cx={CX} cy={CY} r={R_LINE_BAND_OUTER} fill="none" stroke={tickStroke} strokeWidth={0.8} />
+        {/* 同心圓邊線（不畫爻線填色最外圈包覆線，保留通透感） */}
         <circle cx={CX} cy={CY} r={R_LINE_BAND_INNER} fill="none" stroke={strokeColor} strokeWidth={1.2} />
         <circle cx={CX} cy={CY} r={R_GATE_INNER} fill="none" stroke={strokeColor} strokeWidth={1.4} />
         <circle cx={CX} cy={CY} r={R_ZODIAC_INNER} fill="none" stroke={strokeColor} strokeWidth={1.4} />

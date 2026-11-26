@@ -375,13 +375,14 @@ export function MandalaRing3D() {
       ctx.fill();
     }
 
-    // 2b. 只在各資料環之間（含最外圈數字/象限到卦象之間）的薄環上填上定義爻線小色塊（逆時針 1→6 爻）
+    // 2b. 只在各資料環交界（含星座與神格環之間、最外圈數字／象限到卦象之間）的薄環上填上定義爻線小色塊（逆時針 1→6 爻）
     const lineBlockBands: Array<[number, number]> = [
-      [34.5, 36.2], // 內環邊界
-      [48.5, 50.2], // 星座與八卦之間
-      [62.5, 64.2], // 中心與神格之間
-      [76.5, 78.2], // 數字與象限之間
-      [83.5, RING_RADII.corridorOuter], // 數字／象限到卦象之間的 6 爻刻度細環
+      [34.5, 36.2], // 星體與密碼子環交界
+      [48.5, 50.2], // 八卦與星座環交界
+      [55.5, 57.2], // 星座與神格環之間
+      [62.5, 64.2], // 神格與中心示意環交界
+      [76.5, 78.2], // 阿拉伯數字與象限環交界
+      [83.5, RING_RADII.corridorOuter], // 象限／數字到卦象之間的 6 爻刻度細環
     ];
 
     for (const g of MANDALA_GATES) {
@@ -409,7 +410,7 @@ export function MandalaRing3D() {
       }
     }
 
-    // 3a. 最外圈（數字／象限到卦象之間）的 384 條 6 爻細刻度線（不貫穿整張圓盤，視覺極清爽）
+    // 3a. 最外圈（象限／數字到卦象之間）的 384 條 6 爻細刻度線（開放式不封外圈）
     ctx.strokeStyle = isLight ? 'rgba(100, 116, 139, 0.45)' : 'rgba(148, 163, 184, 0.28)';
     ctx.lineWidth = 0.85;
     const rTickInPx = rToPx(83.5);
@@ -426,33 +427,73 @@ export function MandalaRing3D() {
       }
     }
 
-    // 3b. 64 等分 1/64 閘門放射分隔線（從中庭邊緣貫穿至數字與卦象之間，寬度同步前端調參面板）
-    ctx.strokeStyle = isLight ? 'rgba(71, 85, 105, 0.65)' : 'rgba(148, 163, 184, 0.45)';
-    ctx.lineWidth = config.gateDividerWidth;
-    for (const g of MANDALA_GATES) {
-      const boundaryAngle = g.angleRad - sectorStep / 2;
-      const cos = Math.cos(boundaryAngle);
-      const sin = Math.sin(boundaryAngle);
-      ctx.beginPath();
-      ctx.moveTo(half + cos * rInnerPx, half + sin * rInnerPx);
-      ctx.lineTo(half + cos * rOuterPx, half + sin * rOuterPx);
-      ctx.stroke();
+    // 3b. 依每一層資料的實際單位數獨立繪製切塊邊框（透明底色，不讓閘門分割線貫穿內外）：
+    //     - 64 塊：星體 (22..34.5)、密碼子環 (34.5..41.5)、中心示意 (62.5..69.5)、阿拉伯數字 (69.5..76.5) + 外圈 6 爻主刻度 (83.5..88)
+    //     - 8 塊：八卦 (41.5..48.5)
+    //     - 12 塊：星座 (48.5..55.5)
+    //     - 16 塊：神格 (55.5..62.5)
+    //     - 4 塊：象限 (76.5..83.5)
+    const wheelIdxToAngle = (idx: number) => -Math.PI / 2 - ((idx - 57.5) / 64) * Math.PI * 2;
+    const drawRadialSegments = (angles: number[], rIn: number, rOut: number, lineW: number) => {
+      const pIn = rToPx(rIn);
+      const pOut = rToPx(rOut);
+      ctx.lineWidth = lineW;
+      for (const a of angles) {
+        const cos = Math.cos(a);
+        const sin = Math.sin(a);
+        ctx.beginPath();
+        ctx.moveTo(half + cos * pIn, half + sin * pIn);
+        ctx.lineTo(half + cos * pOut, half + sin * pOut);
+        ctx.stroke();
+      }
+    };
+
+    ctx.strokeStyle = isLight ? 'rgba(51, 65, 85, 0.72)' : 'rgba(148, 163, 184, 0.48)';
+
+    // 64 塊層（閘門分隔線寬度同步調參面板 gateDividerWidth）
+    const gateAngles = MANDALA_GATES.map((g) => g.angleRad - sectorStep / 2);
+    const bands64: Array<[number, number]> = [
+      [RING_RADII.atriumMax, 34.5], // 星體／生理環
+      [34.5, 41.5], // 密碼子環
+      [62.5, 69.5], // 中心示意環
+      [69.5, 76.5], // 阿拉伯數字環
+      [83.5, RING_RADII.corridorOuter], // 最外圈 6 爻主刻度
+    ];
+    for (const [rIn, rOut] of bands64) {
+      drawRadialSegments(gateAngles, rIn, rOut, config.gateDividerWidth);
     }
 
-    // 4. 10 層同心圓清晰分隔線
+    // 八卦：8 塊（每塊涵蓋 8 個閘門，起於 idx = 4 - 0.5）
+    const trigramAngles = Array.from({ length: 8 }, (_, i) => wheelIdxToAngle(i * 8 + 4 - 0.5));
+    drawRadialSegments(trigramAngles, 41.5, 48.5, Math.max(2.2, config.gateDividerWidth * 0.9));
+
+    // 星座：12 塊（天蠍／射手交界精準對齊 Gate 14／34 = 52.5）
+    const zodiacAngles = Array.from({ length: 12 }, (_, i) =>
+      wheelIdxToAngle(i * (64 / 12) - 5 / 6)
+    );
+    drawRadialSegments(zodiacAngles, 48.5, 55.5, Math.max(2.2, config.gateDividerWidth * 0.9));
+
+    // 神格：16 塊（每塊涵蓋 4 個閘門，起於 idx = 62 - 0.5）
+    const godheadAngles = Array.from({ length: 16 }, (_, i) => wheelIdxToAngle(i * 4 + 62 - 0.5));
+    drawRadialSegments(godheadAngles, 55.5, 62.5, Math.max(2.0, config.gateDividerWidth * 0.85));
+
+    // 象限：4 塊（每塊涵蓋 16 個閘門，起於 idx = 2 - 0.5）
+    const quadrantAngles = Array.from({ length: 4 }, (_, i) => wheelIdxToAngle(i * 16 + 2 - 0.5));
+    drawRadialSegments(quadrantAngles, 76.5, 83.5, Math.max(2.6, config.gateDividerWidth));
+
+    // 4. 各層同心圓框線（不封最外圈 R=88，保留通透感）
     const ringDefs = [
       { r: RING_RADII.atriumMax, w: 2.8 },
-      { r: 34.5, w: 1.8 },
-      { r: 41.5, w: 1.8 },
-      { r: 48.5, w: 1.8 },
-      { r: 55.5, w: 1.8 },
-      { r: 62.5, w: 1.8 },
-      { r: 69.5, w: 1.8 },
+      { r: 34.5, w: 2.0 },
+      { r: 41.5, w: 2.0 },
+      { r: 48.5, w: 2.0 },
+      { r: 55.5, w: 2.0 },
+      { r: 62.5, w: 2.0 },
+      { r: 69.5, w: 2.0 },
       { r: 76.5, w: 2.2 },
       { r: 83.5, w: 2.4 },
-      { r: RING_RADII.corridorOuter, w: 2.4 },
     ];
-    ctx.strokeStyle = isLight ? 'rgba(71, 85, 105, 0.68)' : 'rgba(148, 163, 184, 0.45)';
+    ctx.strokeStyle = isLight ? 'rgba(51, 65, 85, 0.72)' : 'rgba(148, 163, 184, 0.48)';
     for (const ring of ringDefs) {
       ctx.lineWidth = ring.w;
       ctx.beginPath();
