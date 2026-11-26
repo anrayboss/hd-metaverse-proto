@@ -90,6 +90,7 @@ interface WorldState {
   interiorSpace: InteriorSpace;
   avatarConfig: AvatarConfig;
   cameraFocusTarget: [number, number, number] | null;
+  freeRoamResetTick: number;
   showReceiptModal: boolean;
   // 1/64 完整閘門走廊極座標狀態（R ∈ [23, 87]）
   activeCorridorIndex: number;
@@ -190,6 +191,7 @@ export const useWorldStore = create<WorldState>((set, get) => ({
     scale: 1,
   },
   cameraFocusTarget: null,
+  freeRoamResetTick: 0,
   showReceiptModal: false,
   activeCorridorIndex: initialChart.redSun.gateInfo.wheelIndex,
   corridorRadius: 85,
@@ -221,6 +223,15 @@ export const useWorldStore = create<WorldState>((set, get) => ({
         interiorSpace: null,
         cameraFocusTarget: null,
       });
+      return;
+    }
+    if (stage === 'free-roam') {
+      set((s) => ({
+        stage,
+        interiorSpace: null,
+        cameraFocusTarget: null,
+        freeRoamResetTick: s.freeRoamResetTick + 1,
+      }));
       return;
     }
     set({ stage, interiorSpace: null, cameraFocusTarget: null });

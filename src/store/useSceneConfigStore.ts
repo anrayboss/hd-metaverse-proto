@@ -51,8 +51,10 @@ export interface SceneConfig {
 
 interface SceneConfigState {
   config: SceneConfig;
+  showRuler: boolean;
   saveStatus: string;
   setConfig: (partial: Partial<SceneConfig>) => void;
+  setShowRuler: (show: boolean) => void;
   resetConfig: () => void;
   saveToLocalFile: () => Promise<void>;
 }
@@ -61,12 +63,15 @@ export const DEFAULT_SCENE_CONFIG: SceneConfig = { ...initialConfig };
 
 export const useSceneConfigStore = create<SceneConfigState>((set, get) => ({
   config: { ...DEFAULT_SCENE_CONFIG },
+  showRuler: false,
   saveStatus: '',
 
   setConfig: (partial) =>
     set((state) => ({
       config: { ...state.config, ...partial },
     })),
+
+  setShowRuler: (showRuler) => set({ showRuler }),
 
   resetConfig: () => set({ config: { ...DEFAULT_SCENE_CONFIG }, saveStatus: '已還原初始值' }),
 

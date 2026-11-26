@@ -4,6 +4,7 @@ import { DEFAULT_SCENE_CONFIG, useSceneConfigStore } from '../store/useSceneConf
 
 export function SceneStudioPanel() {
   const setConfig = useSceneConfigStore((s) => s.setConfig);
+  const setShowRuler = useSceneConfigStore((s) => s.setShowRuler);
   const saveToLocalFile = useSceneConfigStore((s) => s.saveToLocalFile);
   const saveStatus = useSceneConfigStore((s) => s.saveStatus);
 
@@ -74,6 +75,7 @@ export function SceneStudioPanel() {
         bodyGraphCamY: { value: DEFAULT_SCENE_CONFIG.bodyGraphCamY, min: 10, max: 90, step: 1, label: '人體圖鏡頭 Y' },
         bodyGraphCamZ: { value: DEFAULT_SCENE_CONFIG.bodyGraphCamZ, min: 0.1, max: 60, step: 1, label: '人體圖鏡頭 Z' },
         freeRoamSpeed: { value: DEFAULT_SCENE_CONFIG.freeRoamSpeed, min: 8, max: 80, step: 2, label: '自由漫遊速度' },
+        showRuler: { value: false, label: '📏 顯示尺規 (懸停長寬高)' },
       },
       { collapsed: true }
     ),
@@ -81,14 +83,17 @@ export function SceneStudioPanel() {
       void saveToLocalFile();
     }),
     '↩️ 重置為已存檔數值': button(() => {
-      set(DEFAULT_SCENE_CONFIG);
+      set({ ...DEFAULT_SCENE_CONFIG, showRuler: false });
       setConfig(DEFAULT_SCENE_CONFIG);
+      setShowRuler(false);
     }),
   }));
 
   useEffect(() => {
-    setConfig(values);
-  }, [values, setConfig]);
+    const { showRuler, ...sceneValues } = values;
+    setConfig(sceneValues);
+    setShowRuler(showRuler);
+  }, [values, setConfig, setShowRuler]);
 
   return (
     <>

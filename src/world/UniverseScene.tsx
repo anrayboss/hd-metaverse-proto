@@ -5,6 +5,7 @@ import { PhysiologyCorridors3D } from './PhysiologyCorridors3D';
 import { BodyGraph3D } from './BodyGraph3D';
 import { CameraRig } from './CameraRig';
 import { PlayerAvatar } from './PlayerAvatar';
+import { RulerOverlay } from './RulerOverlay';
 import { useWorldStore } from '../store/useWorldStore';
 import { useSceneConfigStore } from '../store/useSceneConfigStore';
 
@@ -43,6 +44,7 @@ export function UniverseScene() {
         <PhysiologyCorridors3D />
         <BodyGraph3D />
         <PlayerAvatar />
+        <RulerOverlay />
         <CameraRig />
       </Canvas>
     </div>

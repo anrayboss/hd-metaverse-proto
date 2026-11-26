@@ -9,6 +9,7 @@ import { useSceneConfigStore } from '../store/useSceneConfigStore';
 import { avatarState } from './avatarState';
 
 type RigMode = 'overview' | 'corridor' | 'interior' | 'free-roam';
+const WORLD_UP = new THREE.Vector3(0, 1, 0);
 
 export function CameraRig() {
   const { camera } = useThree();
@@ -19,12 +20,14 @@ export function CameraRig() {
   const enteredCenterIdRef = useRef<string | null>(null);
   const prevModeRef = useRef<RigMode>('overview');
   const prevCorridorDirRef = useRef<'in' | 'out'>('in');
+  const prevFreeRoamTickRef = useRef(0);
   const corridorGlideRef = useRef(false);
   const freeRoamGlideRef = useRef(false);
 
   const stage = useWorldStore((s) => s.stage);
   const chart = useWorldStore((s) => s.chart);
   const cameraFocusTarget = useWorldStore((s) => s.cameraFocusTarget);
+  const freeRoamResetTick = useWorldStore((s) => s.freeRoamResetTick);
   const interiorSpace = useWorldStore((s) => s.interiorSpace);
   const activeCorridorIndex = useWorldStore((s) => s.activeCorridorIndex);
   const corridorRadius = useWorldStore((s) => s.corridorRadius);
@@ -132,8 +135,8 @@ export function CameraRig() {
       case 'free-roam':
       default:
         return {
-          desiredPos: new THREE.Vector3(0, 26, 74),
-          desiredTarget: new THREE.Vector3(0, 14, 48),
+          desiredPos: new THREE.Vector3(0, config.birdEyeHeight, 0.1),
+          desiredTarget: new THREE.Vector3(0, 0.5, 0),
         };
     }
   }, [
@@ -168,6 +171,9 @@ export function CameraRig() {
 
     const modeChanged = prevModeRef.current !== currentMode;
 
+    const minCamY = config.floorY + 0.15;
+    const minAvatarY = config.floorY + 0.35;
+
     // 1. 人體圖內部自由探索（全第三人稱：controls.target 永遠綁定在 avatarState.position）
     if (currentMode === 'interior' && interiorSpace) {
       const entryKey =
@@ -196,6 +202,7 @@ export function CameraRig() {
         if (avatarState.position.distanceTo(nextAvatarPos) < 0.08) {
           enteredCenterIdRef.current = entryKey;
         }
+        if (camera.position.y < minCamY) camera.position.y = minCamY;
         controls.update();
         prevModeRef.current = currentMode;
         return;
@@ -207,26 +214,46 @@ export function CameraRig() {
       const speed = (keys['ShiftLeft'] || keys['ShiftRight'] ? 7.5 : 3.4) * delta;
       moveDelta.set(0, 0, 0);
       camera.getWorldDirection(forward);
-      forward.normalize();
-      right.crossVectors(forward, camera.up).normalize();
+      forward.y = 0;
+      if (forward.lengthSq() < 1e-6) {
+        forward.set(0, 0, -1);
+      } else {
+        forward.normalize();
+      }
+      right.crossVectors(forward, WORLD_UP).normalize();
 
       if (keys['KeyW'] || keys['ArrowUp']) moveDelta.addScaledVector(forward, speed);
       if (keys['KeyS'] || keys['ArrowDown']) moveDelta.addScaledVector(forward, -speed);
       if (keys['KeyD'] || keys['ArrowRight']) moveDelta.addScaledVector(right, speed);
       if (keys['KeyA'] || keys['ArrowLeft']) moveDelta.addScaledVector(right, -speed);
-      if (keys['KeyE']) moveDelta.y += speed;
-      if (keys['KeyQ']) moveDelta.y -= speed;
+
+      const verticalDelta = ((keys['KeyE'] ? 1 : 0) - (keys['KeyQ'] ? 1 : 0)) * speed;
 
       if (moveDelta.lengthSq() > 0) {
         avatarState.position.add(moveDelta);
         camera.position.add(moveDelta);
+        controls.target.add(moveDelta);
         avatarState.velocity.copy(moveDelta).divideScalar(Math.max(delta, 0.001));
         avatarState.heading = Math.atan2(moveDelta.x, moveDelta.z);
       } else {
         avatarState.velocity.multiplyScalar(0.8);
       }
 
-      controls.target.lerp(avatarState.position, 1 - Math.exp(-delta * 14));
+      if (verticalDelta !== 0) {
+        const clampedAvatarY = Math.max(minAvatarY, avatarState.position.y + verticalDelta);
+        const actualDy = clampedAvatarY - avatarState.position.y;
+        avatarState.position.y = clampedAvatarY;
+        camera.position.y = Math.max(minCamY, camera.position.y + actualDy);
+        controls.target.y = clampedAvatarY;
+      }
+
+      const xzAlpha = 1 - Math.exp(-delta * 14);
+      controls.target.x = THREE.MathUtils.lerp(controls.target.x, avatarState.position.x, xzAlpha);
+      controls.target.z = THREE.MathUtils.lerp(controls.target.z, avatarState.position.z, xzAlpha);
+      if (verticalDelta === 0) {
+        controls.target.y = THREE.MathUtils.lerp(controls.target.y, avatarState.position.y, xzAlpha);
+      }
+      if (camera.position.y < minCamY) camera.position.y = minCamY;
 
       // GTA 式自動走出偵測（改判化身座標，避免拉遠鏡頭誤觸退出）
       const avatarR = Math.hypot(avatarState.position.x, avatarState.position.z);
@@ -347,6 +374,7 @@ export function CameraRig() {
         controls.target.lerp(avatarState.position, 1 - Math.exp(-delta * 14));
       }
 
+      if (camera.position.y < minCamY) camera.position.y = minCamY;
       controls.update();
       prevModeRef.current = currentMode;
       return;
@@ -359,18 +387,20 @@ export function CameraRig() {
       const lerpAlpha = 1 - Math.exp(-delta * 3.0);
       camera.position.lerp(desiredPos, lerpAlpha);
       controls.target.lerp(desiredTarget, lerpAlpha);
+      if (camera.position.y < minCamY) camera.position.y = minCamY;
       controls.update();
       prevModeRef.current = currentMode;
       return;
     }
 
     // 4. 外部自由探索模式（全第三人稱：繞著微中子化身飛翔）
-    if (modeChanged) {
-      if (prevModeRef.current === 'overview') {
-        avatarState.position.set(0, 14, 48);
-        freeRoamGlideRef.current = true;
-      }
-      // 若是從 interior 或 corridor 升空退出，完全保留當下 avatarState.position 與鏡頭位置，零跳轉
+    if (freeRoamResetTick !== prevFreeRoamTickRef.current) {
+      prevFreeRoamTickRef.current = freeRoamResetTick;
+      avatarState.position.set(0, 0.5, 0);
+      freeRoamGlideRef.current = true;
+    } else if (modeChanged && prevModeRef.current === 'overview') {
+      avatarState.position.set(0, 0.5, 0);
+      freeRoamGlideRef.current = true;
     }
 
     if (isUserInteracting.current) {
@@ -389,7 +419,7 @@ export function CameraRig() {
       const lerpAlpha = 1 - Math.exp(-delta * 3.8);
       camera.position.lerp(desiredPos, lerpAlpha);
       controls.target.lerp(avatarState.position, lerpAlpha);
-      if (camera.position.distanceTo(desiredPos) < 0.6) {
+      if (camera.position.distanceTo(desiredPos) < 0.8) {
         freeRoamGlideRef.current = false;
       }
     }
@@ -401,28 +431,50 @@ export function CameraRig() {
     moveDelta.set(0, 0, 0);
 
     camera.getWorldDirection(forward);
-    forward.normalize();
-    right.crossVectors(forward, camera.up).normalize();
+    forward.y = 0;
+    if (forward.lengthSq() < 1e-6) {
+      forward.set(0, 0, -1);
+    } else {
+      forward.normalize();
+    }
+    right.crossVectors(forward, WORLD_UP).normalize();
 
     if (keys['KeyW'] || keys['ArrowUp']) moveDelta.addScaledVector(forward, speed);
     if (keys['KeyS'] || keys['ArrowDown']) moveDelta.addScaledVector(forward, -speed);
     if (keys['KeyD'] || keys['ArrowRight']) moveDelta.addScaledVector(right, speed);
     if (keys['KeyA'] || keys['ArrowLeft']) moveDelta.addScaledVector(right, -speed);
-    if (keys['KeyE']) moveDelta.y += speed;
-    if (keys['KeyQ']) moveDelta.y -= speed;
+
+    const verticalDelta = ((keys['KeyE'] ? 1 : 0) - (keys['KeyQ'] ? 1 : 0)) * speed;
 
     if (moveDelta.lengthSq() > 0) {
       freeRoamGlideRef.current = false;
       useWorldStore.setState({ cameraFocusTarget: null });
       avatarState.position.add(moveDelta);
       camera.position.add(moveDelta);
+      controls.target.add(moveDelta);
       avatarState.velocity.copy(moveDelta).divideScalar(Math.max(delta, 0.001));
       avatarState.heading = Math.atan2(moveDelta.x, moveDelta.z);
     } else {
       avatarState.velocity.multiplyScalar(0.82);
     }
 
-    controls.target.lerp(avatarState.position, 1 - Math.exp(-delta * 14));
+    if (verticalDelta !== 0) {
+      freeRoamGlideRef.current = false;
+      useWorldStore.setState({ cameraFocusTarget: null });
+      const clampedAvatarY = Math.max(minAvatarY, avatarState.position.y + verticalDelta);
+      const actualDy = clampedAvatarY - avatarState.position.y;
+      avatarState.position.y = clampedAvatarY;
+      camera.position.y = Math.max(minCamY, camera.position.y + actualDy);
+      controls.target.y = clampedAvatarY;
+    }
+
+    const xzAlpha = 1 - Math.exp(-delta * 14);
+    controls.target.x = THREE.MathUtils.lerp(controls.target.x, avatarState.position.x, xzAlpha);
+    controls.target.z = THREE.MathUtils.lerp(controls.target.z, avatarState.position.z, xzAlpha);
+    if (verticalDelta === 0 && !freeRoamGlideRef.current) {
+      controls.target.y = THREE.MathUtils.lerp(controls.target.y, avatarState.position.y, xzAlpha);
+    }
+    if (camera.position.y < minCamY) camera.position.y = minCamY;
 
     // GTA 式自動進入偵測（改判化身座標）：微中子飛進中庭範圍內即無縫進入人體圖內部空間
     const freeR = Math.hypot(avatarState.position.x, avatarState.position.z);
@@ -456,6 +508,7 @@ export function CameraRig() {
       }
       minDistance={1.5}
       maxDistance={290}
+      maxPolarAngle={Math.PI / 2}
       onStart={() => {
         isUserInteracting.current = true;
       }}
