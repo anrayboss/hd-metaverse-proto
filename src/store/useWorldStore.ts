@@ -48,6 +48,10 @@ export type SelectedEntity =
 
 export type InteriorSpace =
   | {
+      type: 'free';
+      fromGate?: number;
+    }
+  | {
       type: 'center';
       centerId: CenterId;
       position: [number, number, number];
@@ -58,7 +62,7 @@ export type InteriorSpace =
       name: string;
       start: [number, number, number];
       end: [number, number, number];
-      progress: number; // 0..1 沿著通道軸心移動
+      progress: number;
     }
   | null;
 
@@ -105,6 +109,7 @@ interface WorldState {
     start: [number, number, number],
     end: [number, number, number]
   ) => void;
+  enterBodyGraphInteriorAuto: (fromGate?: number) => void;
   enterCenterInterior: (centerId: CenterId, position: [number, number, number]) => void;
   enterChannelInterior: (
     channelId: string,
@@ -298,6 +303,7 @@ export const useWorldStore = create<WorldState>((set, get) => ({
       activeCorridorIndex: idx,
       corridorRadius: radius,
       corridorDirection: dir,
+      interiorSpace: null,
       selected: { type: 'gate', gate: MANDALA_GATES[idx] },
       cameraFocusTarget: null,
     });
@@ -341,6 +347,14 @@ export const useWorldStore = create<WorldState>((set, get) => ({
         (start[1] + end[1]) / 2,
         (start[2] + end[2]) / 2,
       ],
+    }),
+
+  enterBodyGraphInteriorAuto: (fromGate) =>
+    set({
+      stage: 'free-roam',
+      interiorSpace: { type: 'free', fromGate },
+      selected: null,
+      cameraFocusTarget: null,
     }),
 
   enterCenterInterior: (centerId, position) =>

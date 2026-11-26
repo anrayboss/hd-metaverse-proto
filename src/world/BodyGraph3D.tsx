@@ -28,7 +28,7 @@ const CENTER_NAME_TO_ID: Record<string, CenterId> = {
 };
 
 /** 整合迴路 5 條分支通道（改由 34、10 匯流至 57-20 主幹線，不再拉 6 條交叉直線） */
-const INTEGRATION_BRANCH_IDS = new Set(['20-10', '20-34', '10-57', '10-34', '57-34']);
+const INTEGRATION_BRANCH_IDS = new Set(['10-20', '34-20', '34-10', '57-10', '34-57']);
 
 /** 計算點 P 投影到線段 A-B 上的匯流點（限制在 t ∈ [0.22, 0.78] 以保持自然接管） */
 function projectPointToSegment(

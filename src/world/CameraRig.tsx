@@ -148,14 +148,18 @@ export function CameraRig() {
     const controls = controlsRef.current;
     if (!controls) return;
 
-    // 1. 統一「人體圖內部自由步行空間」：不論從九中心或通道進入，先平滑飛至起點，接著解鎖為 360° 環視 + WASD/QE 自由穿梭（可從中心直接走進通道、反之亦然）
+    // 1. 統一「人體圖內部自由步行空間」：
+    //    - type === 'free'：從曼陀羅走廊或自由飛行自然走入，零跳轉、完全保留當下位置與朝向
+    //    - type === 'center' | 'channel'：先平滑飛至該起點，接著解鎖為統一 360° + WASD/QE 自由步行
     if (interiorSpace) {
       const entryKey =
-        interiorSpace.type === 'center'
-          ? `center:${interiorSpace.centerId}`
-          : `channel:${interiorSpace.channelId}`;
+        interiorSpace.type === 'free'
+          ? 'free'
+          : interiorSpace.type === 'center'
+            ? `center:${interiorSpace.centerId}`
+            : `channel:${interiorSpace.channelId}`;
 
-      if (enteredCenterIdRef.current !== entryKey) {
+      if (interiorSpace.type !== 'free' && enteredCenterIdRef.current !== entryKey) {
         let initCam: THREE.Vector3;
         let initTarget: THREE.Vector3;
         if (interiorSpace.type === 'center') {
@@ -178,9 +182,11 @@ export function CameraRig() {
         return;
       }
 
-      // 已進入人體圖內部空間：統一自由漫遊，可任意在九中心與 36 通道間雙向行走
+      enteredCenterIdRef.current = entryKey;
+
+      // 已進入人體圖內部空間：統一自由步行，可任意在九中心與 36 通道間雙向行走
       const keys = keysPressed.current;
-      const speed = (keys['ShiftLeft'] || keys['ShiftRight'] ? 6.5 : 3.0) * delta;
+      const speed = (keys['ShiftLeft'] || keys['ShiftRight'] ? 7.5 : 3.4) * delta;
       moveDelta.set(0, 0, 0);
       camera.getWorldDirection(forward);
       forward.normalize();
@@ -197,13 +203,42 @@ export function CameraRig() {
         camera.position.add(moveDelta);
         controls.target.add(moveDelta);
       }
+
+      // GTA 式自動走出偵測（帶遲滯區間防邊界抖動）：
+      const camR = Math.hypot(camera.position.x, camera.position.z);
+      const camY = camera.position.y;
+
+      // 水平走出中庭外緣（R > 23.4 且低於 5.2m）→ 無縫走進對應方位角的 1/64 曼陀羅走廊（朝外 Out）
+      if (camR > 23.4 && camY < 5.2) {
+        const camAngle = Math.atan2(camera.position.z, camera.position.x);
+        let nearestGate = MANDALA_GATES[0];
+        let bestDiff = Infinity;
+        for (const g of MANDALA_GATES) {
+          let d = Math.abs(g.angleRad - camAngle);
+          if (d > Math.PI) d = Math.PI * 2 - d;
+          if (d < bestDiff) {
+            bestDiff = d;
+            nearestGate = g;
+          }
+        }
+        useWorldStore.getState().enterCorridorByGate(nearestGate.gate, 'out', 24.8);
+        return;
+      }
+
+      // 垂直飛高離開（y > 6.2m）→ 無縫退回鳥瞰自由探索模式
+      if (camY > 6.2) {
+        useWorldStore.getState().exitInteriorSpace();
+        useWorldStore.setState({ stage: 'free-roam' });
+        return;
+      }
+
       controls.update();
       return;
     }
 
     enteredCenterIdRef.current = null;
 
-    // 3. 1/64 曼陀羅閘門走廊模式
+    // 3. 1/64 曼陀羅閘門走廊模式（走到內口 R <= 23.2 時無縫走進人體圖內部空間！）
     const inCorridor = stage === 'corridor' || stage === 'black-sun';
 
     if (inCorridor) {
@@ -223,6 +258,21 @@ export function CameraRig() {
       const forwardSign = corridorDirection === 'in' ? -1 : 1;
       if (keys['KeyW'] || keys['ArrowUp']) nextR += forwardSign * walkSpeed;
       if (keys['KeyS'] || keys['ArrowDown']) nextR -= forwardSign * walkSpeed;
+
+      // 走廊內口無縫進人體圖：走到 R <= 23.2 且朝內時直接走進人體圖中庭內部！
+      if (nextR <= 23.2 && corridorDirection === 'in') {
+        const a = smoothCorridorAngle.current;
+        const entryR = 20.6;
+        const entryY = Math.max(0.9, config.bodyGraphFlatY + 1.15);
+        camera.position.set(Math.cos(a) * entryR, entryY, Math.sin(a) * entryR);
+        controls.target.set(Math.cos(a) * (entryR - 4), entryY - 0.1, Math.sin(a) * (entryR - 4));
+        controls.update();
+        useWorldStore
+          .getState()
+          .enterBodyGraphInteriorAuto(MANDALA_GATES[activeCorridorIndex].gate);
+        return;
+      }
+
       if (nextR !== corridorRadius) {
         useWorldStore.getState().setCorridorRadius(nextR);
       }
@@ -285,6 +335,14 @@ export function CameraRig() {
       useWorldStore.setState({ cameraFocusTarget: null });
       camera.position.add(moveDelta);
       controls.target.add(moveDelta);
+    }
+
+    // GTA 式自動進入偵測：自由飛行降低並進入中庭範圍（R < 21.5 且 y < 4.8）即無縫進入人體圖內部空間
+    const freeR = Math.hypot(camera.position.x, camera.position.z);
+    const freeY = camera.position.y;
+    if (freeR < 21.5 && freeY < 4.8 && freeY > -1.0) {
+      useWorldStore.getState().enterBodyGraphInteriorAuto();
+      return;
     }
 
     controls.update();

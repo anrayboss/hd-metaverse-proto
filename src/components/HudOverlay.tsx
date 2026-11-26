@@ -322,13 +322,17 @@ export function HudOverlay() {
         <section className="guide-panel">
           <span className="guide-badge guide-badge--cyan">
             人體圖內部自由漫遊｜
-            {interiorSpace.type === 'center'
-              ? `起點：${CENTERS.find((c) => c.id === interiorSpace.centerId)?.name}`
-              : `起點：${interiorSpace.channelId} ${interiorSpace.name}`}
+            {interiorSpace.type === 'free'
+              ? interiorSpace.fromGate
+                ? `從 Gate ${interiorSpace.fromGate} 走廊無縫進入`
+                : '無縫進入中庭空間'
+              : interiorSpace.type === 'center'
+                ? `起點：${CENTERS.find((c) => c.id === interiorSpace.centerId)?.name}`
+                : `起點：${interiorSpace.channelId} ${interiorSpace.name}`}
           </span>
           <p style={{ marginTop: 6 }}>
-            滑鼠拖曳 360° 轉頭，<code>W A S D</code> 直接從九中心走進相連通道（反之亦然），
-            <code>Q / E</code> 升降，按 <code>Esc</code> 退出。
+            滑鼠拖曳 360° 轉頭，<code>W A S D</code> 自由穿梭九中心與通道；走出外緣將無縫銜接對應閘門走廊，按{' '}
+            <code>E</code> 飛高或 <code>Esc</code> 退出。
           </p>
           <div className="guide-actions" style={{ marginTop: 10 }}>
             <button type="button" className="btn-primary" onClick={exitInteriorSpace}>
