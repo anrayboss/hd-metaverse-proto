@@ -11,7 +11,7 @@ import {
   RING_RADII,
 } from '../data/mandalaData';
 import { ENABLE_SUN_GUIDE, useWorldStore } from '../store/useWorldStore';
-import { getActivePlanetList } from '../engine/hdCalculator';
+import { getActivePlanetList, PLANET_SYMBOLS } from '../engine/hdCalculator';
 import { useSceneConfigStore } from '../store/useSceneConfigStore';
 
 interface GateHexagramProps {
@@ -306,7 +306,7 @@ export function MandalaRing3D() {
     return geom;
   }, [config.floorDepth, discRadius]);
 
-  // 直接繪製於地板頂面的高解析貼圖：包含 6 爻均分放射線、定義閘門與爻線填色、加粗閘門分隔線與 10 層同心圓線
+  // 直接繪製於地板頂面的高解析貼圖（純白底 + 各資料環之間的 6 爻小塊填色 + 放射星體符號 + 加粗閘門分隔線）
   const floorTexture = useMemo(() => {
     const size = 2048;
     const half = size / 2;
@@ -318,15 +318,17 @@ export function MandalaRing3D() {
 
     const rToPx = (r: number) => (r / discRadius) * half;
 
-    // 1. 地板底色
+    // 1. 3D 地板純白底（深色主題則維持深藍底）
     ctx.fillStyle = isLight ? '#ffffff' : '#0c1324';
     ctx.fillRect(0, 0, size, size);
 
-    // 2. 統計每個 (gate, line) 的意識 / 無意識定義狀態（逆時針 1..6 爻）
+    // 2. 統計每個 (gate, line) 的定義狀態 & 每個 gate 內的啟動星體清單（嚴格同星體列表順序）
     const activeLines = new Map<string, { d: boolean; p: boolean }>();
+    const gatePlanets = new Map<number, Array<{ sym: string; side: 'd' | 'p' }>>();
     const activePlanets = getActivePlanetList(planetToggles);
     if (chart.design && chart.personality) {
       for (const body of activePlanets) {
+        const sym = PLANET_SYMBOLS[body];
         if (viewMode === 0 || viewMode === 1) {
           const item = chart.design[body];
           if (item) {
@@ -334,6 +336,9 @@ export function MandalaRing3D() {
             const cur = activeLines.get(key) || { d: false, p: false };
             cur.d = true;
             activeLines.set(key, cur);
+            const arr = gatePlanets.get(item.gate) || [];
+            arr.push({ sym, side: 'd' });
+            gatePlanets.set(item.gate, arr);
           }
         }
         if (viewMode === 2 || viewMode === 1) {
@@ -343,6 +348,9 @@ export function MandalaRing3D() {
             const cur = activeLines.get(key) || { d: false, p: false };
             cur.p = true;
             activeLines.set(key, cur);
+            const arr = gatePlanets.get(item.gate) || [];
+            arr.push({ sym, side: 'p' });
+            gatePlanets.set(item.gate, arr);
           }
         }
       }
@@ -354,8 +362,8 @@ export function MandalaRing3D() {
     const rInnerPx = rToPx(RING_RADII.atriumMax);
     const rOuterPx = rToPx(RING_RADII.corridorOuter);
 
-    // 2a. 有定義閘門的淡底色
-    ctx.fillStyle = isLight ? 'rgba(252, 242, 228, 0.55)' : 'rgba(252, 242, 228, 0.1)';
+    // 2a. 有定義閘門的柔和走廊底色 #fcf2e4
+    ctx.fillStyle = isLight ? '#fcf2e4' : 'rgba(252, 242, 228, 0.14)';
     for (const g of MANDALA_GATES) {
       if (!activeSet.has(g.gate)) continue;
       const a0 = g.angleRad - sectorStep / 2;
@@ -367,8 +375,15 @@ export function MandalaRing3D() {
       ctx.fill();
     }
 
-    // 2b. 有定義的「閘門爻線（1/6 等份，逆時針 1→6 爻）」從圓心一路延伸至阿拉伯數字與卦象之間填色
-    // 注意：angleRad 隨 wheelIndex 增加而遞減，因此逆時針 1..6 爻是從 angleRad + sectorStep/2 往 angleRad - sectorStep/2 遞減
+    // 2b. 只在各資料環之間（含最外圈數字/象限到卦象之間）的薄環上填上定義爻線小色塊（逆時針 1→6 爻）
+    const lineBlockBands: Array<[number, number]> = [
+      [34.5, 36.2], // 內環邊界
+      [48.5, 50.2], // 星座與八卦之間
+      [62.5, 64.2], // 中心與神格之間
+      [76.5, 78.2], // 數字與象限之間
+      [83.5, RING_RADII.corridorOuter], // 數字／象限到卦象之間的 6 爻刻度細環
+    ];
+
     for (const g of MANDALA_GATES) {
       const startAngle = g.angleRad + sectorStep / 2;
       for (let line = 1; line <= 6; line++) {
@@ -378,39 +393,40 @@ export function MandalaRing3D() {
         const aEnd = startAngle - line * lineStep;
         ctx.fillStyle =
           st.d && st.p
-            ? isLight
-              ? 'rgba(224, 122, 34, 0.42)'
-              : 'rgba(242, 186, 121, 0.48)'
+            ? '#e07a22'
             : st.d
-              ? isLight
-                ? 'rgba(242, 186, 121, 0.45)'
-                : 'rgba(242, 186, 121, 0.34)'
+              ? '#f2ba79'
               : isLight
-                ? 'rgba(100, 116, 139, 0.26)'
-                : 'rgba(203, 213, 225, 0.28)';
-        ctx.beginPath();
-        ctx.moveTo(half, half);
-        ctx.arc(half, half, rOuterPx, aEnd, aStart, false);
-        ctx.closePath();
-        ctx.fill();
+                ? '#111827'
+                : '#e2e8f0';
+        for (const [rIn, rOut] of lineBlockBands) {
+          ctx.beginPath();
+          ctx.arc(half, half, rToPx(rOut), aEnd, aStart, false);
+          ctx.arc(half, half, rToPx(rIn), aStart, aEnd, true);
+          ctx.closePath();
+          ctx.fill();
+        }
       }
     }
 
-    // 3a. 384 條 6 等分爻線細放射線（從圓心延伸到阿拉伯數字與卦象之間）
-    ctx.strokeStyle = isLight ? 'rgba(148, 163, 184, 0.32)' : 'rgba(148, 163, 184, 0.18)';
-    ctx.lineWidth = 0.75;
+    // 3a. 最外圈（數字／象限到卦象之間）的 384 條 6 爻細刻度線（不貫穿整張圓盤，視覺極清爽）
+    ctx.strokeStyle = isLight ? 'rgba(100, 116, 139, 0.45)' : 'rgba(148, 163, 184, 0.28)';
+    ctx.lineWidth = 0.85;
+    const rTickInPx = rToPx(83.5);
     for (const g of MANDALA_GATES) {
       const startAngle = g.angleRad + sectorStep / 2;
       for (let line = 1; line < 6; line++) {
         const a = startAngle - line * lineStep;
+        const cos = Math.cos(a);
+        const sin = Math.sin(a);
         ctx.beginPath();
-        ctx.moveTo(half, half);
-        ctx.lineTo(half + Math.cos(a) * rOuterPx, half + Math.sin(a) * rOuterPx);
+        ctx.moveTo(half + cos * rTickInPx, half + sin * rTickInPx);
+        ctx.lineTo(half + cos * rOuterPx, half + sin * rOuterPx);
         ctx.stroke();
       }
     }
 
-    // 3b. 64 等分 1/64 閘門放射分隔線（從圓心延伸至數字與卦象間，寬度由前端調參面板控制）
+    // 3b. 64 等分 1/64 閘門放射分隔線（從中庭邊緣貫穿至數字與卦象之間，寬度同步前端調參面板）
     ctx.strokeStyle = isLight ? 'rgba(71, 85, 105, 0.65)' : 'rgba(148, 163, 184, 0.45)';
     ctx.lineWidth = config.gateDividerWidth;
     for (const g of MANDALA_GATES) {
@@ -418,7 +434,7 @@ export function MandalaRing3D() {
       const cos = Math.cos(boundaryAngle);
       const sin = Math.sin(boundaryAngle);
       ctx.beginPath();
-      ctx.moveTo(half, half);
+      ctx.moveTo(half + cos * rInnerPx, half + sin * rInnerPx);
       ctx.lineTo(half + cos * rOuterPx, half + sin * rOuterPx);
       ctx.stroke();
     }
@@ -442,6 +458,23 @@ export function MandalaRing3D() {
       ctx.beginPath();
       ctx.arc(half, half, rToPx(ring.r), 0, Math.PI * 2);
       ctx.stroke();
+    }
+
+    // 5. 3D 啟動星體符號（同 2D 做法：置於內資料環與中央人體圖之間，依星體列表順序沿放射方向由外向內排列）
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = 'bold 26px "Noto Sans TC", "Segoe UI Symbol", sans-serif';
+    for (const g of MANDALA_GATES) {
+      const list = gatePlanets.get(g.gate);
+      if (!list || list.length === 0) continue;
+      list.forEach((entry, idx) => {
+        const rSym = 32.2 - idx * 2.55;
+        if (rSym < 22.8) return;
+        const px = half + Math.cos(g.angleRad) * rToPx(rSym);
+        const py = half + Math.sin(g.angleRad) * rToPx(rSym);
+        ctx.fillStyle = entry.side === 'd' ? '#e59a43' : isLight ? '#0f172a' : '#f1f5f9';
+        ctx.fillText(entry.sym, px, py);
+      });
     }
 
     const tex = new THREE.CanvasTexture(canvas);
@@ -516,13 +549,22 @@ export function MandalaRing3D() {
           receiveShadow
         >
           <circleGeometry args={[discRadius - 0.05, 128]} />
-          <meshStandardMaterial
-            map={floorTexture}
-            roughness={0.88}
-            metalness={0.02}
-            polygonOffset
-            polygonOffsetFactor={-1}
-          />
+          {isLight ? (
+            <meshBasicMaterial
+              map={floorTexture}
+              toneMapped={false}
+              polygonOffset
+              polygonOffsetFactor={-1}
+            />
+          ) : (
+            <meshStandardMaterial
+              map={floorTexture}
+              roughness={0.88}
+              metalness={0.02}
+              polygonOffset
+              polygonOffsetFactor={-1}
+            />
+          )}
         </mesh>
       )}
 

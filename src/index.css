@@ -1512,11 +1512,16 @@ body,
 }
 
 
-/* 調參面板 (Leva) 起始位置改至左上角「人類設計宇宙」標題正下方 */
-#leva__root > div {
-  top: 76px !important;
-  left: 16px !important;
-  right: auto !important;
+/* 調參面板 (Leva fill 容器) 固定於左上角「人類設計宇宙」標題正下方 */
+.studio-leva-dock {
+  position: fixed;
+  top: 78px;
+  left: 16px;
+  width: 280px;
+  max-height: calc(100vh - 150px);
+  overflow-y: auto;
+  z-index: 90;
+  pointer-events: auto;
 }
 
 .controls-hint__interior-row {

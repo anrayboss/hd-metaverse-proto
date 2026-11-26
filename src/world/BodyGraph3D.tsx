@@ -476,10 +476,14 @@ function SplineAtriumBodyGraph({
 
   return (
     <group position={[0, 0.12, 0]} scale={config.bodyGraphScale}>
-      {/* 中庭圓形底板 */}
+      {/* 中庭圓形底板（淺色模式純白底） */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.04, 0]}>
         <circleGeometry args={[config.bodyGraphAtriumRadius, 64]} />
-        <meshStandardMaterial color={isLight ? '#f8fafc' : '#090e1c'} roughness={0.9} />
+        {isLight ? (
+          <meshBasicMaterial color="#ffffff" toneMapped={false} />
+        ) : (
+          <meshStandardMaterial color="#090e1c" roughness={0.9} />
+        )}
       </mesh>
 
       {/* Spline 3D 模型（9 大中心 + 閘門定位塊） */}

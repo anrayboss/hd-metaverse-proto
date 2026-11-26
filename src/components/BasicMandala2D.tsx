@@ -1,39 +1,47 @@
 import { useMemo } from 'react';
-import { MANDALA_GATES } from '../data/mandalaData';
+import { MANDALA_GATES, QuadrantId } from '../data/mandalaData';
 import { getActivePlanetList, PLANET_SYMBOLS } from '../engine/hdCalculator';
 import { useSceneConfigStore } from '../store/useSceneConfigStore';
 import { useWorldStore } from '../store/useWorldStore';
 import { BodyGraph2DSvg } from './BodyGraph2DSvg';
 
-// 與 3D MandalaRing3D 完全同源：天蠍與射手交界精準對齊 Gate 14 (52) 與 Gate 34 (53) 交界 (52.5)
-const ZODIAC_RING_3D_ORDER: Array<{ name: string; symbol: string; bandColor: string }> = [
-  { symbol: '♒', name: '水瓶', bandColor: '#a8c97f' },
-  { symbol: '♓', name: '雙魚', bandColor: '#8faec9' },
-  { symbol: '♈', name: '牡羊', bandColor: '#df8888' },
-  { symbol: '♉', name: '金牛', bandColor: '#a98d73' },
-  { symbol: '♊', name: '雙子', bandColor: '#a8c97f' },
-  { symbol: '♋', name: '巨蟹', bandColor: '#8faec9' },
-  { symbol: '♌', name: '獅子', bandColor: '#df8888' },
-  { symbol: '♍', name: '處女', bandColor: '#a98d73' },
-  { symbol: '♎', name: '天秤', bandColor: '#a8c97f' },
-  { symbol: '♏', name: '天蠍', bandColor: '#8faec9' },
-  { symbol: '♐', name: '射手', bandColor: '#df8888' },
-  { symbol: '♑', name: '魔羯', bandColor: '#a98d73' },
+// 天蠍與射手交界精準對齊 Gate 14 (52) 與 Gate 34 (53) 交界 (52.5)
+const ZODIAC_RING_3D_ORDER: Array<{ name: string; symbol: string }> = [
+  { symbol: '♒', name: '水瓶' },
+  { symbol: '♓', name: '雙魚' },
+  { symbol: '♈', name: '牡羊' },
+  { symbol: '♉', name: '金牛' },
+  { symbol: '♊', name: '雙子' },
+  { symbol: '♋', name: '巨蟹' },
+  { symbol: '♌', name: '獅子' },
+  { symbol: '♍', name: '處女' },
+  { symbol: '♎', name: '天秤' },
+  { symbol: '♏', name: '天蠍' },
+  { symbol: '♐', name: '射手' },
+  { symbol: '♑', name: '魔羯' },
 ];
+
+const QUADRANT_NUM_COLOR: Record<QuadrantId, string> = {
+  initiation: '#a6342a', // 第一象限（紅棕）
+  civilization: '#3f7337', // 第二象限（綠）
+  duality: '#a35d1e', // 第三象限（橘棕）
+  mutation: '#24486b', // 第四象限（深藍）
+};
 
 const CX = 500;
 const CY = 500;
-const R_HEX_CENTER = 468; // 最外圈易經卦象（不加外框或包覆線）
-const R_TICK_OUTER = 434; // 6 爻放射線延伸至阿拉伯數字與卦象之間
-const R_GATE_OUTER = 420; // 阿拉伯數字圈外緣
-const R_GATE_INNER = 368; // 阿拉伯數字圈內緣 / 星座圈外緣
+const R_HEX_CENTER = 470; // 最外圈易經卦象（無任何包覆線條）
+const R_LINE_BAND_OUTER = 434; // 數字到卦象之間的 6 爻細環外緣
+const R_LINE_BAND_INNER = 420; // 數字圈外緣 / 6 爻細環內緣
+const R_GATE_INNER = 374; // 數字圈內緣 / 星座圈外緣
 const R_ZODIAC_INNER = 324; // 星座圈內緣
-const R_PLANET_MARK = 300; // 啟動星體符號位置（星座內側）
+const R_PLANET_START = 304; // 星體符號放射起始半徑（星座環與人體圖之間）
+const R_PLANET_STEP = 20; // 同一閘門多個星體由外向內的放射間距
+const R_INNER_RING = 190; // 內區 64 條輕量放射格線內緣（不穿透中央人體圖）
 
 const SECTOR_RAD = (Math.PI * 2) / 64; // 5.625°
 const LINE_RAD = SECTOR_RAD / 6; // 0.9375°
 
-/** 與 3D MandalaRing3D / mandalaData.ts 完全一致的 wheelIndex → 角度公式 */
 function wheelIndexToSvgRad(wheelFloat: number): number {
   return -Math.PI / 2 - ((wheelFloat - 57.5) / 64) * Math.PI * 2;
 }
@@ -52,19 +60,13 @@ function describeArcWedge(rInner: number, rOuter: number, startRad: number, endR
   return `M ${x1} ${y1} A ${rOuter} ${rOuter} 0 0 ${sweep} ${x2} ${y2} L ${x3} ${y3} A ${rInner} ${rInner} 0 0 ${revSweep} ${x4} ${y4} Z`;
 }
 
-function describePieWedge(rOuter: number, startRad: number, endRad: number): string {
-  const [x1, y1] = polar(rOuter, startRad);
-  const [x2, y2] = polar(rOuter, endRad);
-  const sweep = endRad > startRad ? 1 : 0;
-  return `M ${CX} ${CY} L ${x1} ${y1} A ${rOuter} ${rOuter} 0 0 ${sweep} ${x2} ${y2} Z`;
-}
-
 /**
- * 基礎版 2D 曼陀羅：
- * - 最外圈：64 易經卦象（乾淨懸浮於最外圍，無外圓框與包覆線）
- * - 384 條 6 等分爻線放射線從圓心延伸至阿拉伯數字與卦象之間（逆時針 1→6 爻），有定義的閘門爻線填色
- * - 64 條閘門分隔線寬度同步連動前端調參面板 gateDividerWidth
- * - 內圈：12 星座彩色環（天蠍／射手交界精準重疊 Gate 14／34 交界）
+ * 基礎版 2D 曼陀羅（對齊參考圖 1）：
+ * - 最外圈：64 易經卦象（無框、無包覆線）
+ * - 數字到卦象之間的薄 6 爻刻度環：只對有定義的 (gate, line) 繪製小弧塊填色（最省資源且極致清爽）
+ * - 數字圈：64 閘門阿拉伯數字（依四象限著色，定義閘門淡米黃底色）
+ * - 星座圈：白底細黑框，天蠍／射手交界對齊 Gate 14／34 交界
+ * - 星座與人體圖之間：星體符號依星體列表順序沿放射方向由外向內排列
  * - 正中央：可點擊的 2D 平面人體圖（body-graph.svg）
  */
 export function BasicMandala2D() {
@@ -77,17 +79,22 @@ export function BasicMandala2D() {
   const enterCorridorByGate = useWorldStore((s) => s.enterCorridorByGate);
 
   const isLight = theme === 'light';
-  const strokeColor = isLight ? '#94a3b8' : '#334155';
-  const lineTickColor = isLight ? 'rgba(148, 163, 184, 0.35)' : 'rgba(148, 163, 184, 0.2)';
+  const strokeColor = isLight ? '#334155' : '#475569';
+  const softStroke = isLight ? 'rgba(100, 116, 139, 0.35)' : 'rgba(148, 163, 184, 0.25)';
+  const tickStroke = isLight ? 'rgba(100, 116, 139, 0.5)' : 'rgba(148, 163, 184, 0.35)';
   const textPrimary = isLight ? '#0f172a' : '#f1f5f9';
-  const textMuted = isLight ? '#475569' : '#94a3b8';
-  const innerBg = isLight ? '#ffffff' : '#0f172a';
-  const gateDividerStroke = Math.max(0.6, gateDividerWidth * 0.45);
+  const ringBg = isLight ? '#ffffff' : '#0f172a';
+  const gateDividerStroke = Math.max(0.6, gateDividerWidth * 0.42);
 
-  // 統計每個 (gate, line) 的啟動星體（依 viewMode 與 planetToggles 動態更新）
-  const activeLineMap = useMemo(() => {
-    const map = new Map<string, { d: string[]; p: string[] }>();
-    if (!chart.design || !chart.personality) return map;
+  // 1. 每個 (gate, line) 的定義狀態（給 6 爻小弧塊填色用）
+  // 2. 每個 gate 內的啟動星體清單（嚴格依 PLANET_ORDER_ALL 順序，放射狀由外向內排在星座環與人體圖之間）
+  const { activeLineMap, gatePlanetsMap } = useMemo(() => {
+    const lineMap = new Map<string, { d: boolean; p: boolean }>();
+    const byGate = new Map<number, Array<{ sym: string; side: 'd' | 'p'; line: number }>>();
+    if (!chart.design || !chart.personality) {
+      return { activeLineMap: lineMap, gatePlanetsMap: byGate };
+    }
+
     const activePlanets = getActivePlanetList(planetToggles);
     for (const body of activePlanets) {
       const sym = PLANET_SYMBOLS[body];
@@ -95,22 +102,31 @@ export function BasicMandala2D() {
         const item = chart.design[body];
         if (item) {
           const key = `${item.gate}.${item.line}`;
-          const cur = map.get(key) || { d: [], p: [] };
-          cur.d.push(sym);
-          map.set(key, cur);
+          const cur = lineMap.get(key) || { d: false, p: false };
+          cur.d = true;
+          lineMap.set(key, cur);
+
+          const arr = byGate.get(item.gate) || [];
+          arr.push({ sym, side: 'd', line: item.line });
+          byGate.set(item.gate, arr);
         }
       }
       if (viewMode === 2 || viewMode === 1) {
         const item = chart.personality[body];
         if (item) {
           const key = `${item.gate}.${item.line}`;
-          const cur = map.get(key) || { d: [], p: [] };
-          cur.p.push(sym);
-          map.set(key, cur);
+          const cur = lineMap.get(key) || { d: false, p: false };
+          cur.p = true;
+          lineMap.set(key, cur);
+
+          const arr = byGate.get(item.gate) || [];
+          arr.push({ sym, side: 'p', line: item.line });
+          byGate.set(item.gate, arr);
         }
       }
     }
-    return map;
+
+    return { activeLineMap: lineMap, gatePlanetsMap: byGate };
   }, [chart.design, chart.personality, viewMode, planetToggles]);
 
   const activeGateSet = useMemo(() => new Set(chart.activeGates), [chart.activeGates]);
@@ -118,102 +134,127 @@ export function BasicMandala2D() {
   return (
     <div className="basic-mandala-wrap">
       <svg viewBox="0 0 1000 1000" className="basic-mandala-svg" role="img" aria-label="基礎版人類設計曼陀羅">
-        {/* 內圓背景（只包到阿拉伯數字圈外緣，最外圈卦象不加外圓框） */}
-        <circle cx={CX} cy={CY} r={R_GATE_OUTER} fill={innerBg} stroke={strokeColor} strokeWidth={1.3} />
+        {/* 背景底圓（到數字圈外緣，卦象不加外框） */}
+        <circle cx={CX} cy={CY} r={R_LINE_BAND_INNER} fill={ringBg} />
 
-        {/* 1. 有定義的閘門爻線填色（從圓心延伸至阿拉伯數字圈外緣，每閘門 6 等份逆時針 1→6 爻） */}
+        {/* 1. 內圈輕量 64 等分放射格線（星座環內側至人體圖外圍，清爽不雜亂） */}
+        {MANDALA_GATES.map((gate) => {
+          const a = gate.angleRad + SECTOR_RAD / 2;
+          const [x1, y1] = polar(R_INNER_RING, a);
+          const [x2, y2] = polar(R_ZODIAC_INNER, a);
+          return (
+            <line
+              key={`inner-ray-${gate.gate}`}
+              x1={x1}
+              y1={y1}
+              x2={x2}
+              y2={y2}
+              stroke={softStroke}
+              strokeWidth={0.75}
+            />
+          );
+        })}
+
+        {/* 2. 數字圈：有定義閘門的淡底色塊（僅填在數字環上，不蓋到星座或人體圖） */}
+        {MANDALA_GATES.map((gate) => {
+          if (!activeGateSet.has(gate.gate)) return null;
+          const a0 = gate.angleRad - SECTOR_RAD / 2;
+          const a1 = gate.angleRad + SECTOR_RAD / 2;
+          return (
+            <path
+              key={`gate-bg-${gate.gate}`}
+              d={describeArcWedge(R_GATE_INNER, R_LINE_BAND_INNER, a0, a1)}
+              fill={isLight ? '#fcf2e4' : 'rgba(242, 186, 121, 0.16)'}
+            />
+          );
+        })}
+
+        {/* 3. 數字到卦象之間的薄 6 爻環：僅對有定義的 (gate, line) 填小色塊（逆時針 1→6 爻） */}
         {MANDALA_GATES.map((gate) => {
           const startAngle = gate.angleRad + SECTOR_RAD / 2;
           return [1, 2, 3, 4, 5, 6].map((line) => {
             const st = activeLineMap.get(`${gate.gate}.${line}`);
             if (!st) return null;
-            const hasD = st.d.length > 0;
-            const hasP = st.p.length > 0;
-            const a0 = startAngle - (line - 1) * LINE_RAD;
-            const a1 = startAngle - line * LINE_RAD;
+            const aStart = startAngle - (line - 1) * LINE_RAD;
+            const aEnd = startAngle - line * LINE_RAD;
             const fill =
-              hasD && hasP
-                ? 'rgba(224, 122, 34, 0.34)'
-                : hasD
-                  ? 'rgba(242, 186, 121, 0.36)'
+              st.d && st.p
+                ? '#e07a22'
+                : st.d
+                  ? '#f2ba79'
                   : isLight
-                    ? 'rgba(100, 116, 139, 0.2)'
-                    : 'rgba(203, 213, 225, 0.22)';
+                    ? '#111827'
+                    : '#e2e8f0';
             return (
               <path
-                key={`line-fill-${gate.gate}-${line}`}
-                d={describePieWedge(R_GATE_OUTER, a1, a0)}
+                key={`line-block-${gate.gate}-${line}`}
+                d={describeArcWedge(R_LINE_BAND_INNER, R_LINE_BAND_OUTER, aEnd, aStart)}
                 fill={fill}
-                stroke="none"
               />
             );
           });
         })}
 
-        {/* 2. 384 條 6 等分爻線放射線（從圓心拉出並延伸至阿拉伯數字與卦象之間） */}
+        {/* 4. 數字到卦象之間的 384 條 6 爻細刻度線（只畫在薄環上，不延伸入圓心） */}
         {MANDALA_GATES.map((gate) => {
           const startAngle = gate.angleRad + SECTOR_RAD / 2;
           return [1, 2, 3, 4, 5].map((line) => {
             const a = startAngle - line * LINE_RAD;
-            const [x2, y2] = polar(R_TICK_OUTER, a);
+            const [x1, y1] = polar(R_LINE_BAND_INNER, a);
+            const [x2, y2] = polar(R_LINE_BAND_OUTER, a);
             return (
               <line
-                key={`line-ray-${gate.gate}-${line}`}
-                x1={CX}
-                y1={CY}
+                key={`tick-${gate.gate}-${line}`}
+                x1={x1}
+                y1={y1}
                 x2={x2}
                 y2={y2}
-                stroke={lineTickColor}
-                strokeWidth={0.55}
+                stroke={tickStroke}
+                strokeWidth={0.6}
               />
             );
           });
         })}
 
-        {/* 3. 64 條閘門分隔線（從圓心延伸至阿拉伯數字與卦象之間，寬度同步調參面板 gateDividerWidth） */}
+        {/* 5. 64 條閘門分隔線（數字圈＋6 爻薄環，寬度同步前端調參面板 gateDividerWidth） */}
         {MANDALA_GATES.map((gate) => {
           const a = gate.angleRad + SECTOR_RAD / 2;
-          const [x2, y2] = polar(R_TICK_OUTER, a);
+          const [x1, y1] = polar(R_GATE_INNER, a);
+          const [x2, y2] = polar(R_LINE_BAND_OUTER, a);
           return (
             <line
               key={`gate-div-${gate.gate}`}
-              x1={CX}
-              y1={CY}
+              x1={x1}
+              y1={y1}
               x2={x2}
               y2={y2}
               stroke={strokeColor}
               strokeWidth={gateDividerStroke}
-              opacity={0.78}
+              opacity={0.82}
             />
           );
         })}
 
-        {/* 4. 內圈：12 星座彩色環（天蠍與射手交界精準對齊 Gate 14 與 Gate 34 交界） */}
+        {/* 6. 內圈 12 星座環（白底細框，天蠍／射手交界對齊 Gate 14／34 交界） */}
         {ZODIAC_RING_3D_ORDER.map((z, i) => {
           const startIdx = i * (64 / 12) - 5 / 6;
-          const endIdx = (i + 1) * (64 / 12) - 5 / 6;
           const midIdx = (i + 0.5) * (64 / 12) - 5 / 6;
           const startRad = wheelIndexToSvgRad(startIdx);
-          const endRad = wheelIndexToSvgRad(endIdx);
           const midRad = wheelIndexToSvgRad(midIdx);
+          const [lx1, ly1] = polar(R_ZODIAC_INNER, startRad);
+          const [lx2, ly2] = polar(R_GATE_INNER, startRad);
           const [tx, ty] = polar((R_ZODIAC_INNER + R_GATE_INNER) / 2, midRad);
           const deg = (midRad * 180) / Math.PI + 90;
 
           return (
             <g key={z.name}>
-              <path
-                d={describeArcWedge(R_ZODIAC_INNER, R_GATE_INNER, endRad, startRad)}
-                fill={z.bandColor}
-                fillOpacity={isLight ? 0.88 : 0.65}
-                stroke={isLight ? '#ffffff' : '#0f172a'}
-                strokeWidth={1.2}
-              />
+              <line x1={lx1} y1={ly1} x2={lx2} y2={ly2} stroke={strokeColor} strokeWidth={1.3} />
               <g transform={`translate(${tx}, ${ty}) rotate(${deg})`}>
                 <text
                   textAnchor="middle"
                   dominantBaseline="middle"
-                  fontSize="15.5"
-                  fill="#ffffff"
+                  fontSize="16"
+                  fill={textPrimary}
                   fontWeight={700}
                 >
                   {`${z.symbol} ${z.name}`}
@@ -223,49 +264,43 @@ export function BasicMandala2D() {
           );
         })}
 
-        {/* 數字圈內外圓邊線（不包覆最外圈易經卦象） */}
-        <circle cx={CX} cy={CY} r={R_GATE_OUTER} fill="none" stroke={strokeColor} strokeWidth={1.3} />
-        <circle cx={CX} cy={CY} r={R_GATE_INNER} fill="none" stroke={strokeColor} strokeWidth={1.2} />
-        <circle cx={CX} cy={CY} r={R_ZODIAC_INNER} fill="none" stroke={strokeColor} strokeWidth={1.2} />
+        {/* 同心圓邊線（最外圈只到 6 爻細環，不包覆易經卦象） */}
+        <circle cx={CX} cy={CY} r={R_LINE_BAND_OUTER} fill="none" stroke={tickStroke} strokeWidth={0.8} />
+        <circle cx={CX} cy={CY} r={R_LINE_BAND_INNER} fill="none" stroke={strokeColor} strokeWidth={1.2} />
+        <circle cx={CX} cy={CY} r={R_GATE_INNER} fill="none" stroke={strokeColor} strokeWidth={1.4} />
+        <circle cx={CX} cy={CY} r={R_ZODIAC_INNER} fill="none" stroke={strokeColor} strokeWidth={1.4} />
 
-        {/* 5. 啟動星體符號（精準對齊該閘門爻線角度，置於星座環內側） */}
+        {/* 7. 啟動星體符號：位於星座環與人體圖之間，依星體列表順序沿放射方向由外向內排列 */}
         {MANDALA_GATES.map((gate) => {
-          const startAngle = gate.angleRad + SECTOR_RAD / 2;
-          return [1, 2, 3, 4, 5, 6].map((line) => {
-            const st = activeLineMap.get(`${gate.gate}.${line}`);
-            if (!st) return null;
-            const midA = startAngle - (line - 0.5) * LINE_RAD;
-            const allSyms: Array<{ sym: string; side: 'd' | 'p' }> = [
-              ...st.d.map((s) => ({ sym: s, side: 'd' as const })),
-              ...st.p.map((s) => ({ sym: s, side: 'p' as const })),
-            ];
-            return allSyms.map((entry, idx) => {
-              const [px, py] = polar(R_PLANET_MARK - idx * 20, midA);
-              return (
-                <text
-                  key={`sym-${gate.gate}-${line}-${entry.side}-${idx}`}
-                  x={px}
-                  y={py}
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  fontSize="17"
-                  fontWeight={700}
-                  fill={entry.side === 'd' ? '#e59a43' : textPrimary}
-                >
-                  {entry.sym}
-                </text>
-              );
-            });
+          const list = gatePlanetsMap.get(gate.gate);
+          if (!list || list.length === 0) return null;
+          return list.map((entry, idx) => {
+            const [px, py] = polar(R_PLANET_START - idx * R_PLANET_STEP, gate.angleRad);
+            return (
+              <text
+                key={`psym-${gate.gate}-${entry.side}-${idx}`}
+                x={px}
+                y={py}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                fontSize="17"
+                fontWeight={700}
+                fill={entry.side === 'd' ? '#e59a43' : textPrimary}
+              >
+                {entry.sym}
+              </text>
+            );
           });
         })}
 
-        {/* 6. 中間圈（64 閘門阿拉伯數字）＋ 最外圈（無外框包覆的 64 易經卦象） */}
+        {/* 8. 中間圈（64 閘門阿拉伯數字）＋ 最外圈（無外框包覆的 64 易經卦象） */}
         {MANDALA_GATES.map((gate) => {
           const a = gate.angleRad;
           const isActive = activeGateSet.has(gate.gate);
-          const [numX, numY] = polar((R_GATE_INNER + R_GATE_OUTER) / 2, a);
+          const [numX, numY] = polar((R_GATE_INNER + R_LINE_BAND_INNER) / 2, a);
           const [hexX, hexY] = polar(R_HEX_CENTER, a);
           const rotDeg = (a * 180) / Math.PI + 90;
+          const numColor = isLight ? QUADRANT_NUM_COLOR[gate.quadrant] : isActive ? '#fde68a' : '#cbd5e1';
 
           return (
             <g
@@ -289,9 +324,9 @@ export function BasicMandala2D() {
                 <text
                   textAnchor="middle"
                   dominantBaseline="middle"
-                  fontSize={isActive ? '15.5' : '13.5'}
-                  fontWeight={isActive ? 800 : 600}
-                  fill={isActive ? textPrimary : textMuted}
+                  fontSize={isActive ? '16' : '14.5'}
+                  fontWeight={isActive ? 800 : 700}
+                  fill={numColor}
                 >
                   {gate.gate}
                 </text>
@@ -300,7 +335,7 @@ export function BasicMandala2D() {
               {/* 最外圈：純淨懸浮的易經六爻卦象（無任何包覆線條） */}
               <g transform={`translate(${hexX}, ${hexY}) rotate(${rotDeg})`}>
                 {gate.lines.map((isYang, idx) => {
-                  const y = (2.5 - idx) * 4.5;
+                  const y = (2.5 - idx) * 4.4;
                   if (isYang === 1) {
                     return (
                       <line

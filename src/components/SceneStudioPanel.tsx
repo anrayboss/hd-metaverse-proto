@@ -106,7 +106,9 @@ export function SceneStudioPanel() {
 
   return (
     <>
-      <Leva collapsed={true} titleBar={{ title: '🎛️ 場景調參 Studio', drag: true, filter: true }} />
+      <div className="studio-leva-dock">
+        <Leva fill collapsed={true} titleBar={{ title: '🎛️ 場景調參 Studio', drag: false, filter: true }} />
+      </div>
       {hoveredRuler && (
         <div
           className="ruler-badge"
