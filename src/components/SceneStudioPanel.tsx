@@ -128,9 +128,11 @@ export function SceneStudioPanel() {
   const saveToLocalFile = useSceneConfigStore((s) => s.saveToLocalFile);
   const saveStatus = useSceneConfigStore((s) => s.saveStatus);
 
-  // Adobe 風格雙獨立可折疊面板：上方「場景調參 Studio」、下方獨立「全站調色盤」
-  const studioStore = useCreateStore();
-  const paletteStore = useCreateStore();
+  // 用 useState 鎖定 store 參考，使其生命週期與 useControls 內部 useState 一致，避免 Vite HMR 時不同步導致面板變空隱藏
+  const rawStudioStore = useCreateStore();
+  const rawPaletteStore = useCreateStore();
+  const [studioStore] = useState(() => rawStudioStore);
+  const [paletteStore] = useState(() => rawPaletteStore);
 
   const [studioValues, setStudio] = useControls(
     () => ({
@@ -294,6 +296,7 @@ export function SceneStudioPanel() {
             store={studioStore}
             fill
             collapsed={true}
+            neverHide
             titleBar={{ title: '🎛️ 場景調參 Studio', drag: false, filter: true }}
           />
         )}
@@ -301,6 +304,7 @@ export function SceneStudioPanel() {
           store={paletteStore}
           fill
           collapsed={true}
+          neverHide
           titleBar={{ title: '🎨 全站調色盤 (2D / 3D)', drag: false, filter: true }}
         />
       </div>
