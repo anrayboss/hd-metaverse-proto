@@ -70,6 +70,7 @@ function ChannelConduit({
   onSelectChannel: () => void;
 }) {
   const pulseRef = useRef<THREE.Mesh>(null);
+  const config = useSceneConfigStore((s) => s.config);
   const bothActive = activeA && activeB;
 
   const { segA, segB, dir, length, ringPositions, fullQuat } = useMemo(() => {
@@ -108,15 +109,19 @@ function ChannelConduit({
 
   useFrame((state) => {
     if (!pulseRef.current) return;
-    const speed = bothActive ? 0.55 : 0.28;
+    const speed = bothActive ? config.channelPulseSpeed : config.channelPulseSpeed * 0.5;
     const phase = (state.clock.elapsedTime * speed + (gates[0] % 7) * 0.13) % 1;
     pulseRef.current.position.copy(start).addScaledVector(dir, phase * length);
   });
 
   const inactiveColor = isLight ? '#cbd5e1' : '#334155';
   const activeColor = '#f59e0b';
-  // 攝影機在管內時稍微放大管徑，提供舒適的沉浸視野；外部維持細緻建築比例
-  const radius = isInsideThis ? 0.42 : bothActive ? 0.28 : 0.22;
+  // 攝影機在管內時使用管內穿梭管徑，外部依定義與否套用可調管徑
+  const radius = isInsideThis
+    ? config.channelInsideRadius
+    : bothActive
+      ? config.channelActiveRadius
+      : config.channelRadius;
 
   return (
     <group
@@ -166,14 +171,24 @@ function ChannelConduit({
           <meshBasicMaterial
             color={bothActive ? '#fef08a' : isLight ? '#0284c7' : '#7dd3fc'}
             transparent
-            opacity={isInsideThis ? 0.85 : 0.28}
+            opacity={isInsideThis ? Math.max(0.65, config.channelRingOpacity) : config.channelRingOpacity}
           />
         </mesh>
       ))}
 
       {/* 能量微中子光點沿通道流動 */}
       <mesh ref={pulseRef}>
-        <sphereGeometry args={[isInsideThis ? 0.1 : bothActive ? 0.28 : 0.18, 12, 12]} />
+        <sphereGeometry
+          args={[
+            isInsideThis
+              ? config.channelPulseSize * 0.4
+              : bothActive
+                ? config.channelPulseSize
+                : config.channelPulseSize * 0.65,
+            12,
+            12,
+          ]}
+        />
         <meshStandardMaterial
           color={bothActive ? '#fef08a' : isLight ? '#38bdf8' : '#7dd3fc'}
           emissive={bothActive ? '#f59e0b' : '#0ea5e9'}
@@ -220,6 +235,7 @@ function SplineAtriumBodyGraph({
   ) => void;
 }) {
   const { scene } = useGLTF(BODYGRAPH_GLB_URL);
+  const config = useSceneConfigStore((s) => s.config);
   const centerMap = useMemo(() => Object.fromEntries(CENTERS.map((c) => [c.id, c])), []);
 
   const { modelRoot, gatePositions, centerPositions } = useMemo(() => {
@@ -300,12 +316,16 @@ function SplineAtriumBodyGraph({
         const isInsideThisCenter = interiorCenterId === centerId;
         mat.color.set(isDef ? info.color : isLight ? '#f8fafc' : '#1e293b');
         mat.emissive.set(isDef ? info.color : '#64748b');
-        mat.emissiveIntensity = isInsideThisCenter ? 0.42 : isDef ? 0.28 : 0.05;
+        mat.emissiveIntensity = isInsideThisCenter
+          ? config.centerEmissiveDefined * 1.5
+          : isDef
+            ? config.centerEmissiveDefined
+            : 0.05;
         mat.roughness = 0.45;
         // 雙面渲染：讓攝影機飛進九中心內部時可以看到完整立體內牆（不會因背面剔除消失）
         mat.side = THREE.DoubleSide;
         mat.transparent = isInsideThisCenter;
-        mat.opacity = isInsideThisCenter ? 0.72 : 1;
+        mat.opacity = isInsideThisCenter ? config.centerInteriorOpacity : 1;
         mat.needsUpdate = true;
         return;
       }
@@ -318,7 +338,16 @@ function SplineAtriumBodyGraph({
         mat.emissiveIntensity = isActive ? 0.7 : 0.1;
       }
     });
-  }, [modelRoot, definedCenters, activeGates, isLight, centerMap, interiorCenterId]);
+  }, [
+    modelRoot,
+    definedCenters,
+    activeGates,
+    isLight,
+    centerMap,
+    interiorCenterId,
+    config.centerEmissiveDefined,
+    config.centerInteriorOpacity,
+  ]);
 
   // 排除 5 條整合迴路分支（改由 34、10 接到 57-20 主幹線的匯流點）
   const standardChannels = useMemo(
@@ -386,9 +415,9 @@ function SplineAtriumBodyGraph({
   }, [gatePositions, activeGates]);
 
   const toWorldTuple = (v: THREE.Vector3): [number, number, number] => [
-    v.x,
-    v.y + yOffset + 0.12,
-    v.z,
+    v.x * config.bodyGraphScale,
+    v.y * config.bodyGraphScale + yOffset + 0.12,
+    v.z * config.bodyGraphScale,
   ];
 
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
@@ -415,10 +444,10 @@ function SplineAtriumBodyGraph({
   const activeInteriorCenterPos = interiorCenterId ? centerPositions[interiorCenterId] : null;
 
   return (
-    <group position={[0, 0.12, 0]}>
+    <group position={[0, 0.12, 0]} scale={config.bodyGraphScale}>
       {/* 中庭圓形底板 */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.04, 0]}>
-        <circleGeometry args={[21.8, 64]} />
+        <circleGeometry args={[config.bodyGraphAtriumRadius, 64]} />
         <meshStandardMaterial color={isLight ? '#f8fafc' : '#090e1c'} roughness={0.9} />
       </mesh>
 
@@ -445,7 +474,7 @@ function SplineAtriumBodyGraph({
             activeInteriorCenterPos.y + 0.2,
             activeInteriorCenterPos.z,
           ]}
-          intensity={3.5}
+          intensity={config.centerInteriorLight}
           distance={8}
           color="#fef3c7"
         />
@@ -493,7 +522,7 @@ function SplineAtriumBodyGraph({
           />
           {/* 匯流點接頭環 */}
           <mesh position={br.end}>
-            <sphereGeometry args={[0.3, 14, 14]} />
+            <sphereGeometry args={[config.junctionSphereRadius, 14, 14]} />
             <meshStandardMaterial
               color={br.activeA ? '#f59e0b' : isLight ? '#cbd5e1' : '#475569'}
               emissive={br.activeA ? '#f59e0b' : '#0f172a'}

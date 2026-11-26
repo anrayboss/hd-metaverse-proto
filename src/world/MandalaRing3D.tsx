@@ -20,7 +20,11 @@ interface GateHexagramProps {
   isSelected: boolean;
   isLight: boolean;
   hexagramY: number;
+  hexagramScale: number;
   gateNumberY: number;
+  gateNumberSize: number;
+  baseTextSize: number;
+  centerMarkerScale: number;
   centerInfo: CenterInfo;
   onEnterCorridor: (gateNumber: number) => void;
 }
@@ -29,10 +33,12 @@ function CenterMiniMarker({
   shape,
   color,
   position,
+  scale,
 }: {
   shape: CenterInfo['shape'];
   color: string;
   position: [number, number, number];
+  scale: number;
 }) {
   const rotZ =
     shape === 'triangle-down'
@@ -44,7 +50,7 @@ function CenterMiniMarker({
           : 0;
 
   return (
-    <mesh position={position} rotation={[0, 0, rotZ]}>
+    <mesh position={position} rotation={[0, 0, rotZ]} scale={scale}>
       {shape === 'diamond' ? (
         <octahedronGeometry args={[1.15, 0]} />
       ) : shape === 'square' ? (
@@ -64,7 +70,11 @@ function GateHexagram({
   isSelected,
   isLight,
   hexagramY,
+  hexagramScale,
   gateNumberY,
+  gateNumberSize,
+  baseTextSize,
+  centerMarkerScale,
   centerInfo,
   onEnterCorridor,
 }: GateHexagramProps) {
@@ -106,6 +116,7 @@ function GateHexagram({
       {/* 外環第 2 層：易經 64 卦象（全填滿點擊區 + Billboard 永遠正對鏡頭） */}
       <group position={hexPos}>
         <Billboard position={[0, hexagramY, 0]} follow>
+          <group scale={hexagramScale}>
           <mesh
             onClick={(e) => {
               e.stopPropagation();
@@ -185,12 +196,13 @@ function GateHexagram({
               </Html>
             </group>
           )}
+          </group>
         </Billboard>
 
         {/* 卦象上方立體閘門數字（Billboard 永遠正對鏡頭） */}
         <Billboard position={[0, gateNumberY, 0]} follow>
           <Text
-            fontSize={isSpecial ? 1.85 : hovered || isSelected ? 1.65 : 1.35}
+            fontSize={isSpecial ? gateNumberSize * 1.37 : hovered || isSelected ? gateNumberSize * 1.22 : gateNumberSize}
             color={isSpecial ? accentColor : hovered || isSelected ? '#0284c7' : isLight ? '#0f172a' : '#f8fafc'}
             outlineWidth={0.09}
             outlineColor={isLight ? '#ffffff' : '#05070e'}
@@ -206,7 +218,7 @@ function GateHexagram({
       {/* 第 1 層（最外圈）：DNA 鹼基 A/C/G/U */}
       <Billboard position={basePos} follow>
         <Text
-          fontSize={1.15}
+          fontSize={baseTextSize}
           color={isLight ? '#475569' : '#94a3b8'}
           anchorX="center"
           anchorY="middle"
@@ -219,7 +231,7 @@ function GateHexagram({
       {/* 第 4 層：64 閘門數字環（鳥瞰清晰對齊） */}
       <Billboard position={numPos} follow>
         <Text
-          fontSize={1.55}
+          fontSize={gateNumberSize * 1.15}
           color={isSpecial ? accentColor : isLight ? '#0f172a' : '#e2e8f0'}
           outlineWidth={0.06}
           outlineColor={isLight ? '#ffffff' : '#05070e'}
@@ -232,7 +244,12 @@ function GateHexagram({
       </Billboard>
 
       {/* 第 5 層：所屬中心彩色幾何塊狀體 */}
-      <CenterMiniMarker shape={centerInfo.shape} color={centerInfo.color} position={centerPos} />
+      <CenterMiniMarker
+        shape={centerInfo.shape}
+        color={centerInfo.color}
+        position={centerPos}
+        scale={centerMarkerScale}
+      />
 
       {/* 第 9 層：密碼子環 Token 珠 */}
       <mesh position={codonPos}>
@@ -406,7 +423,11 @@ export function MandalaRing3D() {
           isSelected={selected?.type === 'gate' && selected.gate.gate === gate.gate}
           isLight={isLight}
           hexagramY={config.hexagramY}
+          hexagramScale={config.hexagramScale}
           gateNumberY={config.gateNumberY}
+          gateNumberSize={config.gateNumberSize}
+          baseTextSize={config.baseTextSize}
+          centerMarkerScale={config.centerMarkerScale}
           centerInfo={centerMap[gate.centerId]}
           onEnterCorridor={(gateNum) => enterCorridorByGate(gateNum, 'in', 85)}
         />

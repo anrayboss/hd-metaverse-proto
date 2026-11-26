@@ -423,11 +423,13 @@ export function PhysiologyCorridors3D() {
           />
 
           {/* 8 大立體站點（象限 → 數字 → 中心塊狀體 → 神格 → 星座 → 八卦 → 密碼子環 Token → 生理對應） */}
-          <CorridorStations
-            gate={activeGate}
-            centerInfo={centerMap[activeGate.centerId]}
-            isLight={isLight}
-          />
+          <group scale={[1, config.corridorStationScale, 1]}>
+            <CorridorStations
+              gate={activeGate}
+              centerInfo={centerMap[activeGate.centerId]}
+              isLight={isLight}
+            />
+          </group>
         </group>
       )}
     </group>

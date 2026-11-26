@@ -27,12 +27,12 @@ export function UniverseScene() {
         <ambientLight intensity={isLight ? config.ambientIntensity : config.ambientIntensity * 0.45} />
         <directionalLight
           position={[45, 130, 55]}
-          intensity={isLight ? 1.25 : 1.05}
+          intensity={isLight ? config.directionalIntensity : config.directionalIntensity * 0.85}
           color={isLight ? '#ffffff' : '#dbeafe'}
         />
         <pointLight
           position={[0, 14, 0]}
-          intensity={isLight ? 2.5 : 6}
+          intensity={isLight ? config.centerPointLightIntensity : config.centerPointLightIntensity * 2.4}
           distance={58}
           color="#fde68a"
         />

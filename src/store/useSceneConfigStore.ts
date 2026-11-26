@@ -2,17 +2,51 @@ import { create } from 'zustand';
 import initialConfig from '../data/sceneConfig.json';
 
 export interface SceneConfig {
+  // 地板與曼陀羅
   floorY: number;
   floorDepth: number;
   hexagramY: number;
+  hexagramScale: number;
   gateNumberY: number;
+  gateNumberSize: number;
+  baseTextSize: number;
+  centerMarkerScale: number;
+  // 1/64 閘門走廊
   corridorWallHeight: number;
   corridorWallOpacity: number;
   corridorCameraY: number;
+  corridorWalkSpeed: number;
+  corridorStationScale: number;
+  // 中庭人體圖與九中心
   bodyGraphFlatY: number;
+  bodyGraphScale: number;
+  bodyGraphAtriumRadius: number;
+  centerEmissiveDefined: number;
+  centerInteriorOpacity: number;
+  centerInteriorLight: number;
+  // 通道管線與匯流點
+  channelRadius: number;
+  channelActiveRadius: number;
+  channelInsideRadius: number;
+  channelPulseSize: number;
+  channelPulseSpeed: number;
+  channelRingOpacity: number;
+  junctionSphereRadius: number;
+  // 微中子流場
+  neutrinoPointSize: number;
+  neutrinoOpacity: number;
+  neutrinoRotSpeed: number;
+  neutrinoArcHeight: number;
+  neutrinoPulseScale: number;
+  // 光影與鏡頭
   ambientIntensity: number;
+  directionalIntensity: number;
+  centerPointLightIntensity: number;
   fogDensity: number;
   birdEyeHeight: number;
+  bodyGraphCamY: number;
+  bodyGraphCamZ: number;
+  freeRoamSpeed: number;
 }
 
 interface SceneConfigState {

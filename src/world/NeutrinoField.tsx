@@ -4,6 +4,7 @@ import { Line } from '@react-three/drei';
 import * as THREE from 'three';
 import { getGateWorldPosition } from '../data/mandalaData';
 import { useWorldStore } from '../store/useWorldStore';
+import { useSceneConfigStore } from '../store/useSceneConfigStore';
 
 const PARTICLE_COUNT = 2600;
 
@@ -16,6 +17,7 @@ export function NeutrinoField() {
   const isLight = theme === 'light';
   const stage = useWorldStore((s) => s.stage);
   const chart = useWorldStore((s) => s.chart);
+  const config = useSceneConfigStore((s) => s.config);
 
   const { positions, baseColors } = useMemo(() => {
     const pos = new Float32Array(PARTICLE_COUNT * 3);
@@ -55,15 +57,15 @@ export function NeutrinoField() {
 
   const redCurve = useMemo(() => {
     const mid = redGatePos.clone().lerp(corePos, 0.5);
-    mid.y += 10;
+    mid.y += config.neutrinoArcHeight;
     return new THREE.QuadraticBezierCurve3(redGatePos, mid, corePos);
-  }, [redGatePos, corePos]);
+  }, [redGatePos, corePos, config.neutrinoArcHeight]);
 
   const blackCurve = useMemo(() => {
     const mid = corePos.clone().lerp(blackGatePos, 0.5);
-    mid.y += 10;
+    mid.y += config.neutrinoArcHeight;
     return new THREE.QuadraticBezierCurve3(corePos, mid, blackGatePos);
-  }, [blackGatePos, corePos]);
+  }, [blackGatePos, corePos, config.neutrinoArcHeight]);
 
   const redLinePoints = useMemo(
     () => redCurve.getPoints(56).map((p) => [p.x, p.y, p.z] as [number, number, number]),
@@ -77,20 +79,20 @@ export function NeutrinoField() {
   useFrame((state, delta) => {
     const t = state.clock.elapsedTime;
     if (pointsRef.current) {
-      const rotSpeed = stage === 'bodygraph' ? 0.04 : 0.015;
+      const rotSpeed = stage === 'bodygraph' ? config.neutrinoRotSpeed * 2.5 : config.neutrinoRotSpeed;
       pointsRef.current.rotation.y += delta * rotSpeed;
     }
 
     if (redPulseRef.current) {
       const u = (t * 0.24) % 1;
       redPulseRef.current.position.copy(redCurve.getPoint(u));
-      redPulseRef.current.scale.setScalar(0.65 + Math.sin(t * 7) * 0.14);
+      redPulseRef.current.scale.setScalar(config.neutrinoPulseScale + Math.sin(t * 7) * 0.14);
     }
 
     if (blackPulseRef.current) {
       const u = (t * 0.24 + 0.5) % 1;
       blackPulseRef.current.position.copy(blackCurve.getPoint(u));
-      blackPulseRef.current.scale.setScalar(0.65 + Math.cos(t * 7) * 0.14);
+      blackPulseRef.current.scale.setScalar(config.neutrinoPulseScale + Math.cos(t * 7) * 0.14);
     }
   });
 
@@ -112,11 +114,11 @@ export function NeutrinoField() {
           />
         </bufferGeometry>
         <pointsMaterial
-          size={0.32}
+          size={config.neutrinoPointSize}
           color={isLight ? '#64748b' : '#ffffff'}
           vertexColors={!isLight}
           transparent
-          opacity={isLight ? 0.35 : 0.68}
+          opacity={isLight ? config.neutrinoOpacity : Math.min(1, config.neutrinoOpacity * 1.9)}
           blending={isLight ? THREE.NormalBlending : THREE.AdditiveBlending}
           depthWrite={false}
           sizeAttenuation

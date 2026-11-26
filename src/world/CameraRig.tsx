@@ -122,7 +122,7 @@ export function CameraRig() {
         };
       case 'bodygraph':
         return {
-          desiredPos: new THREE.Vector3(0, 36, 16),
+          desiredPos: new THREE.Vector3(0, config.bodyGraphCamY, config.bodyGraphCamZ),
           desiredTarget: new THREE.Vector3(0, 0.35, 0),
         };
       case 'free-roam':
@@ -132,7 +132,14 @@ export function CameraRig() {
           desiredTarget: new THREE.Vector3(0, 0, 0),
         };
     }
-  }, [stage, chart.redSun.gate, cameraFocusTarget, config.birdEyeHeight]);
+  }, [
+    stage,
+    chart.redSun.gate,
+    cameraFocusTarget,
+    config.birdEyeHeight,
+    config.bodyGraphCamY,
+    config.bodyGraphCamZ,
+  ]);
 
   const forward = useMemo(() => new THREE.Vector3(), []);
   const right = useMemo(() => new THREE.Vector3(), []);
@@ -232,7 +239,7 @@ export function CameraRig() {
 
       const keys = keysPressed.current;
       let nextR = corridorRadius;
-      const walkSpeed = 16 * delta;
+      const walkSpeed = config.corridorWalkSpeed * delta;
       const forwardSign = corridorDirection === 'in' ? -1 : 1;
       if (keys['KeyW'] || keys['ArrowUp']) nextR += forwardSign * walkSpeed;
       if (keys['KeyS'] || keys['ArrowDown']) nextR -= forwardSign * walkSpeed;
@@ -280,7 +287,7 @@ export function CameraRig() {
     }
 
     const keys = keysPressed.current;
-    const speed = (keys['ShiftLeft'] || keys['ShiftRight'] ? 48 : 26) * delta;
+    const speed = (keys['ShiftLeft'] || keys['ShiftRight'] ? config.freeRoamSpeed * 1.85 : config.freeRoamSpeed) * delta;
     moveDelta.set(0, 0, 0);
 
     camera.getWorldDirection(forward);
