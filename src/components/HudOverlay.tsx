@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { CENTERS, MANDALA_GATES, QUADRANT_META, RING_RADII } from '../data/mandalaData';
+import { CITY_OPTIONS, DEFAULT_CITY } from '../data/cities';
 import { JourneyStage, useWorldStore } from '../store/useWorldStore';
+import { ChartResultPanel } from './ChartResultPanel';
+import { InfoModal, InfoModalRequest } from './InfoModal';
 
 const STAGE_STEPS: Array<{ id: JourneyStage; label: string }> = [
   { id: 'intro', label: '0. 鳥瞰入口' },
@@ -27,6 +30,10 @@ export function HudOverlay() {
   const toggleTheme = useWorldStore((s) => s.toggleTheme);
   const stage = useWorldStore((s) => s.stage);
   const chart = useWorldStore((s) => s.chart);
+  const isCalculatingChart = useWorldStore((s) => s.isCalculatingChart);
+  const chartError = useWorldStore((s) => s.chartError);
+  const chartRecords = useWorldStore((s) => s.chartRecords);
+  const showChartDrawer = useWorldStore((s) => s.showChartDrawer);
   const selected = useWorldStore((s) => s.selected);
   const showReceiptModal = useWorldStore((s) => s.showReceiptModal);
   const activeCorridorIndex = useWorldStore((s) => s.activeCorridorIndex);
@@ -36,6 +43,9 @@ export function HudOverlay() {
   const nextStage = useWorldStore((s) => s.nextStage);
   const prevStage = useWorldStore((s) => s.prevStage);
   const updateBirthData = useWorldStore((s) => s.updateBirthData);
+  const generateFullChart = useWorldStore((s) => s.generateFullChart);
+  const loadSavedRecord = useWorldStore((s) => s.loadSavedRecord);
+  const setShowChartDrawer = useWorldStore((s) => s.setShowChartDrawer);
   const enterCorridorByGate = useWorldStore((s) => s.enterCorridorByGate);
   const switchAdjacentCorridor = useWorldStore((s) => s.switchAdjacentCorridor);
   const setCorridorRadius = useWorldStore((s) => s.setCorridorRadius);
@@ -43,13 +53,48 @@ export function HudOverlay() {
   const clearSelection = useWorldStore((s) => s.clearSelection);
   const setShowReceiptModal = useWorldStore((s) => s.setShowReceiptModal);
 
+  const [personName, setPersonName] = useState(chart.name === '預設示例' ? '' : chart.name);
   const [birthDate, setBirthDate] = useState(chart.birthDate);
   const [birthTime, setBirthTime] = useState(chart.birthTime);
+  const [cityId, setCityId] = useState(
+    CITY_OPTIONS.find((c) => c.label === chart.locationLabel)?.id || DEFAULT_CITY.id
+  );
+  const [infoModal, setInfoModal] = useState<InfoModalRequest | null>(null);
 
-  const handleEnterUniverse = (e: React.FormEvent) => {
+  const selectedCity = CITY_OPTIONS.find((c) => c.id === cityId) || DEFAULT_CITY;
+
+  const handleGenerateAndEnter = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateBirthData(birthDate, birthTime);
-    setStage('red-sun');
+    const res = await generateFullChart(
+      {
+        name: personName.trim() || '無名',
+        birthDate,
+        birthTime,
+        locationLabel: selectedCity.label,
+        timezone: selectedCity.timezone,
+        lat: selectedCity.lat,
+        lng: selectedCity.lng,
+      },
+      true
+    );
+    if (res) {
+      setStage('red-sun');
+    }
+  };
+
+  const handleJustCalculate = async () => {
+    await generateFullChart(
+      {
+        name: personName.trim() || '無名',
+        birthDate,
+        birthTime,
+        locationLabel: selectedCity.label,
+        timezone: selectedCity.timezone,
+        lat: selectedCity.lat,
+        lng: selectedCity.lng,
+      },
+      true
+    );
   };
 
   const selectedCenter =
@@ -72,7 +117,7 @@ export function HudOverlay() {
           <span className="hud-brand__dot" />
           <div>
             <div className="hud-brand__title">人類設計宇宙｜1/64 閘門走廊</div>
-            <div className="hud-brand__sub">鳥瞰曼陀羅 · 點擊任意卦象進入 8 站立體走廊</div>
+            <div className="hud-brand__sub">鳥瞰曼陀羅 · 瑞士星曆表 30 星體跑圖</div>
           </div>
         </div>
 
@@ -90,6 +135,13 @@ export function HudOverlay() {
         </nav>
 
         <div className="header-actions">
+          <button
+            type="button"
+            className={`btn-outline ${showChartDrawer ? 'btn-outline--active' : ''}`}
+            onClick={() => setShowChartDrawer(!showChartDrawer)}
+          >
+            {showChartDrawer ? '收合跑圖面板' : '📊 跑圖結果'}
+          </button>
           <button type="button" className="btn-ghost" onClick={toggleTheme}>
             {theme === 'light' ? '🌙 深色' : '☀️ 淺色'}
           </button>
@@ -108,13 +160,67 @@ export function HudOverlay() {
         <section className="intro-card" style={{ alignSelf: 'flex-start', margin: 'auto 0 0 0' }}>
           <h1>把自主權還給你</h1>
           <p className="intro-card__desc">
-            輸入出生資料或直接點擊畫面任一卦象進入其 1/64 曼陀羅立體走廊。
+            輸入出生時間與地點，透過瑞士星曆表計算意識／無意識 30 筆星體閘門與爻線，並自動存入紀錄。
           </p>
 
-          <form onSubmit={handleEnterUniverse} className="intro-form">
+          <form onSubmit={handleGenerateAndEnter} className="intro-form">
             <div className="form-row">
               <label>
-                <span>出生日期</span>
+                <span className="label-with-info">
+                  稱呼
+                  <button
+                    type="button"
+                    className="hd-info-btn"
+                    onClick={() => setInfoModal({ mode: 'Label', category: 'name' })}
+                  >
+                    ℹ︎
+                  </button>
+                </span>
+                <input
+                  type="text"
+                  placeholder="請輸入稱呼"
+                  value={personName}
+                  onChange={(e) => setPersonName(e.target.value)}
+                />
+              </label>
+
+              <label>
+                <span className="label-with-info">
+                  出生城市／時區
+                  <button
+                    type="button"
+                    className="hd-info-btn"
+                    onClick={() => setInfoModal({ mode: 'Label', category: 'timezone' })}
+                  >
+                    ℹ︎
+                  </button>
+                </span>
+                <select
+                  className="hd-select"
+                  value={cityId}
+                  onChange={(e) => setCityId(e.target.value)}
+                >
+                  {CITY_OPTIONS.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.label}（{c.timezone}）
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="form-row">
+              <label>
+                <span className="label-with-info">
+                  出生日期
+                  <button
+                    type="button"
+                    className="hd-info-btn"
+                    onClick={() => setInfoModal({ mode: 'Label', category: 'birthdate' })}
+                  >
+                    ℹ︎
+                  </button>
+                </span>
                 <input
                   type="date"
                   value={birthDate}
@@ -126,7 +232,16 @@ export function HudOverlay() {
                 />
               </label>
               <label>
-                <span>出生時間（UTC+8）</span>
+                <span className="label-with-info">
+                  出生時間
+                  <button
+                    type="button"
+                    className="hd-info-btn"
+                    onClick={() => setInfoModal({ mode: 'Label', category: 'birthtime' })}
+                  >
+                    ℹ︎
+                  </button>
+                </span>
                 <input
                   type="time"
                   value={birthTime}
@@ -138,6 +253,25 @@ export function HudOverlay() {
                 />
               </label>
             </div>
+
+            {chartRecords.length > 0 && (
+              <div className="intro-history-row">
+                <select
+                  className="hd-select"
+                  defaultValue=""
+                  onChange={(e) => {
+                    if (e.target.value) loadSavedRecord(e.target.value);
+                  }}
+                >
+                  <option value="">📂 快速載入歷史紀錄（{chartRecords.length} 筆）</option>
+                  {chartRecords.map((rec) => (
+                    <option key={rec.id} value={rec.id}>
+                      {rec.name} · {rec.birthDate} {rec.birthTime} ({rec.locationLabel})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div className="live-preview">
               <div className="preview-item preview-item--red">
@@ -155,16 +289,24 @@ export function HudOverlay() {
               </div>
             </div>
 
+            {chartError && <div className="hd-error-msg">計算失敗：{chartError}</div>}
+
             <div className="guide-actions">
-              <button type="submit" className="btn-primary" style={{ flex: 1 }}>
-                紅太陽起點進入 →
+              <button
+                type="submit"
+                className="btn-primary"
+                style={{ flex: 1 }}
+                disabled={isCalculatingChart}
+              >
+                {isCalculatingChart ? '星曆計算中…' : '繪製人類圖並進入 →'}
               </button>
               <button
                 type="button"
                 className="btn-outline"
-                onClick={() => enterCorridorByGate(55, 'in', 85)}
+                disabled={isCalculatingChart}
+                onClick={handleJustCalculate}
               >
-                直入 Gate 55 走廊
+                僅跑圖檢視
               </button>
             </div>
           </form>
@@ -188,7 +330,9 @@ export function HudOverlay() {
             <>
               <span className="guide-badge guide-badge--cyan">STEP 3 · 人體圖中庭</span>
               <h2>中央九大中心與磁單極</h2>
-              <p>下一步將轉向你的黑太陽閘門（Gate {chart.blackSun.gate}），由內向外走完反向順序走出曼陀羅。</p>
+              <p>
+                下一步將轉向你的黑太陽閘門（Gate {chart.blackSun.gate}），由內向外走完反向順序走出曼陀羅。
+              </p>
             </>
           )}
 
@@ -208,9 +352,15 @@ export function HudOverlay() {
         <section className="guide-panel">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span className="guide-badge guide-badge--cyan">
-              Gate {activeCorridorGate.gate} 走廊｜{corridorDirection === 'in' ? 'IN（外 → 人體圖）' : 'OUT（人體圖 → 外）'}
+              Gate {activeCorridorGate.gate} 走廊｜
+              {corridorDirection === 'in' ? 'IN（外 → 人體圖）' : 'OUT（人體圖 → 外）'}
             </span>
-            <button type="button" className="btn-ghost" style={{ padding: '4px 10px', fontSize: 12 }} onClick={toggleCorridorDirection}>
+            <button
+              type="button"
+              className="btn-ghost"
+              style={{ padding: '4px 10px', fontSize: 12 }}
+              onClick={toggleCorridorDirection}
+            >
               🔄 切換 {corridorDirection === 'in' ? 'Out 反向' : 'In 進人體'} (R)
             </button>
           </div>
@@ -282,7 +432,19 @@ export function HudOverlay() {
         </div>
       )}
 
-      {selected && (
+      {/* 右側完整跑圖結果面板（Zen HD + Ra 標籤包預設折疊 + 視角/行星切換 + 30 星體列表） */}
+      {showChartDrawer && (
+        <ChartResultPanel
+          onOpenInfo={(req) => setInfoModal(req)}
+          onNewChart={() => {
+            setShowChartDrawer(false);
+            setStage('intro');
+          }}
+        />
+      )}
+
+      {/* 閘門／中心檢視卡（避免與跑圖抽屜重疊，開啟抽屜時可由使用者關閉抽屜或同時並存） */}
+      {selected && !showChartDrawer && (
         <aside className="inspector-card">
           <button type="button" className="inspector-close" onClick={clearSelection}>
             ✕
@@ -352,7 +514,7 @@ export function HudOverlay() {
             </button>
             <span className="guide-badge guide-badge--gold">本命能量座標卡</span>
             <h2>
-              {chart.birthDate} {chart.birthTime}
+              {chart.name} · {chart.birthDate} {chart.birthTime}
             </h2>
             <div className="receipt-grid">
               <div className="receipt-box receipt-box--red">
@@ -370,6 +532,7 @@ export function HudOverlay() {
                 <div className="receipt-sub">生理：{chart.blackSun.gateInfo.physiology}</div>
               </div>
             </div>
+            <p className="receipt-note">{chart.ephemerisNote}</p>
             <div className="cta-group">
               <a className="btn-primary" href="https://hdlifestyle.online/self-study-manual/" target="_blank" rel="noreferrer">
                 人類設計自學手冊 →
@@ -381,6 +544,9 @@ export function HudOverlay() {
           </div>
         </div>
       )}
+
+      {/* 過往 2D 跑圖完整字典說明 Modal */}
+      <InfoModal request={infoModal} onClose={() => setInfoModal(null)} />
     </div>
   );
 }
