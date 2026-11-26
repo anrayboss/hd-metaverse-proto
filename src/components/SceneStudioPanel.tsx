@@ -88,6 +88,44 @@ export function SceneStudioPanel() {
       },
       { collapsed: true }
     ),
+    '🎨 全站調色盤 (2D / 3D)': folder(
+      {
+        colorDesign: { value: DEFAULT_SCENE_CONFIG.colorDesign, label: '無意識／品牌色' },
+        colorPersonality: { value: DEFAULT_SCENE_CONFIG.colorPersonality, label: '意識深色' },
+        colorBoth: { value: DEFAULT_SCENE_CONFIG.colorBoth, label: '紅黑雙重色' },
+        colorActiveGateBg: { value: DEFAULT_SCENE_CONFIG.colorActiveGateBg, label: '定義閘門底色' },
+        colorFloorLight: { value: DEFAULT_SCENE_CONFIG.colorFloorLight, label: '淺色底盤／畫布' },
+        colorGridStroke: { value: DEFAULT_SCENE_CONFIG.colorGridStroke, label: '曼陀羅格線色' },
+        colorCircleDefined: { value: DEFAULT_SCENE_CONFIG.colorCircleDefined, label: '2D 定義閘門圈' },
+        colorCircleUndefined: { value: DEFAULT_SCENE_CONFIG.colorCircleUndefined, label: '2D 空白閘門圈' },
+        colorChannelActive: { value: DEFAULT_SCENE_CONFIG.colorChannelActive, label: '3D 啟動通道色' },
+        colorChannelInactive: { value: DEFAULT_SCENE_CONFIG.colorChannelInactive, label: '3D 空白通道色' },
+        '九中心色碼': folder(
+          {
+            colorCenterHead: { value: DEFAULT_SCENE_CONFIG.colorCenterHead, label: '頭頂 Head' },
+            colorCenterAjna: { value: DEFAULT_SCENE_CONFIG.colorCenterAjna, label: '心智 Ajna' },
+            colorCenterThroat: { value: DEFAULT_SCENE_CONFIG.colorCenterThroat, label: '喉嚨 Throat' },
+            colorCenterG: { value: DEFAULT_SCENE_CONFIG.colorCenterG, label: '自性 G' },
+            colorCenterEgo: { value: DEFAULT_SCENE_CONFIG.colorCenterEgo, label: '心臟 Ego' },
+            colorCenterSolar: { value: DEFAULT_SCENE_CONFIG.colorCenterSolar, label: '情緒 Solar' },
+            colorCenterSpleen: { value: DEFAULT_SCENE_CONFIG.colorCenterSpleen, label: '脾臟 Spleen' },
+            colorCenterSacral: { value: DEFAULT_SCENE_CONFIG.colorCenterSacral, label: '薦骨 Sacral' },
+            colorCenterRoot: { value: DEFAULT_SCENE_CONFIG.colorCenterRoot, label: '根部 Root' },
+          },
+          { collapsed: true }
+        ),
+        '2D 四象限數字色': folder(
+          {
+            colorQuadInitiation: { value: DEFAULT_SCENE_CONFIG.colorQuadInitiation, label: '第一象限 起始' },
+            colorQuadCivilization: { value: DEFAULT_SCENE_CONFIG.colorQuadCivilization, label: '第二象限 文明' },
+            colorQuadDuality: { value: DEFAULT_SCENE_CONFIG.colorQuadDuality, label: '第三象限 二元' },
+            colorQuadMutation: { value: DEFAULT_SCENE_CONFIG.colorQuadMutation, label: '第四象限 突變' },
+          },
+          { collapsed: true }
+        ),
+      },
+      { collapsed: true }
+    ),
     '💾 寫回本機 JSON': button(() => {
       void saveToLocalFile();
     }),

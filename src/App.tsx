@@ -12,7 +12,7 @@ export function App() {
     <main className="app-shell" data-theme={theme}>
       {displayMode === 'universe-3d' ? <UniverseScene /> : <FlatChartStage />}
       <HudOverlay />
-      {import.meta.env.DEV && displayMode === 'universe-3d' && <SceneStudioPanel />}
+      {import.meta.env.DEV && <SceneStudioPanel />}
     </main>
   );
 }

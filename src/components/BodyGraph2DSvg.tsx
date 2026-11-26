@@ -3,11 +3,6 @@ import { CENTERS, CenterId, GATE_BY_NUMBER } from '../data/mandalaData';
 import { useSceneConfigStore } from '../store/useSceneConfigStore';
 import { useWorldStore } from '../store/useWorldStore';
 
-const BRAND_COLOR = '#f2ba79';
-const COLOR_CIRCLE_DEFINED = '#FCE9D0';
-const COLOR_CIRCLE_UNDEFINED = '#F2BA78';
-const COLOR_GATE_DESIGN = BRAND_COLOR;
-const COLOR_GATE_PERSONALITY = '#333333';
 const COVERING_GATES = new Set([15, 5, 2, 14, 46, 29]);
 
 const CENTER_ID_TO_SVG_ID: Record<CenterId, string> = {
@@ -60,6 +55,7 @@ export function BodyGraph2DSvg({ className = '' }: { className?: string }) {
   const viewMode = useWorldStore((s) => s.viewMode);
   const planetToggles = useWorldStore((s) => s.planetToggles);
   const theme = useWorldStore((s) => s.theme);
+  const config = useSceneConfigStore((s) => s.config);
   const setDisplayMode = useWorldStore((s) => s.setDisplayMode);
   const enterCorridorByGate = useWorldStore((s) => s.enterCorridorByGate);
   const enterCenterInterior = useWorldStore((s) => s.enterCenterInterior);
@@ -94,8 +90,11 @@ export function BodyGraph2DSvg({ className = '' }: { className?: string }) {
       numberOutlineGroup.style.pointerEvents = 'none';
     }
 
-    const undefinedCenterFill = theme === 'light' ? '#ffffff' : '#1e293b';
-    const personalityColor = theme === 'light' ? COLOR_GATE_PERSONALITY : '#e2e8f0';
+    const undefinedCenterFill = theme === 'light' ? config.colorFloorLight : '#1e293b';
+    const designColor = config.colorDesign;
+    const personalityColor = theme === 'light' ? config.colorPersonality : '#e2e8f0';
+    const circleDefColor = config.colorCircleDefined;
+    const circleUndefColor = config.colorCircleUndefined;
 
     // 1. 重置全部九中心（啟用點擊游標）
     Object.values(CENTER_ID_TO_SVG_ID).forEach((svgId) => {
@@ -111,7 +110,7 @@ export function BodyGraph2DSvg({ className = '' }: { className?: string }) {
     for (let i = 1; i <= 64; i++) {
       const designEl = root.querySelector<SVGElement>(`#gate-${i}-design`);
       const personalityEl = root.querySelector<SVGElement>(`#gate-${i}-personality`);
-      const fillColor = COVERING_GATES.has(i) ? (theme === 'light' ? '#FFFFFF' : '#0f172a') : 'transparent';
+      const fillColor = COVERING_GATES.has(i) ? (theme === 'light' ? config.colorFloorLight : '#0f172a') : 'transparent';
       if (designEl) {
         designEl.style.fill = fillColor;
         designEl.style.cursor = 'pointer';
@@ -148,10 +147,10 @@ export function BodyGraph2DSvg({ className = '' }: { className?: string }) {
     derived.definedCenters.forEach((centerId) => {
       const svgId = CENTER_ID_TO_SVG_ID[centerId];
       const el = root.querySelector<SVGElement>(`#${svgId}`);
-      if (el) el.style.fill = BRAND_COLOR;
+      if (el) el.style.fill = designColor;
     });
 
-    // 4. 著色啟動閘門與閘門圓圈（完全對齊過往 updateLayers 邏輯）
+    // 4. 著色啟動閘門與閘門圓圈（完全對齊過往 updateLayers 邏輯並支援前端調色盤）
     Object.entries(derived.gateStatus).forEach(([gateStr, status]) => {
       const gateNum = Number(gateStr);
       const elD = root.querySelector<SVGElement>(`#gate-${gateNum}-design`);
@@ -159,12 +158,12 @@ export function BodyGraph2DSvg({ className = '' }: { className?: string }) {
       const elCircle = root.querySelector<SVGElement>(`#gate-circle-${gateNum}`);
 
       let showCircle = false;
-      let dColor = COVERING_GATES.has(gateNum) ? (theme === 'light' ? '#FFFFFF' : '#0f172a') : 'transparent';
+      let dColor = COVERING_GATES.has(gateNum) ? (theme === 'light' ? config.colorFloorLight : '#0f172a') : 'transparent';
       let pColor = dColor;
 
       if (viewMode === 0) {
         if (status.d) {
-          dColor = pColor = COLOR_GATE_DESIGN;
+          dColor = pColor = designColor;
           showCircle = true;
         }
       } else if (viewMode === 2) {
@@ -174,11 +173,11 @@ export function BodyGraph2DSvg({ className = '' }: { className?: string }) {
         }
       } else {
         if (status.d && status.p) {
-          dColor = COLOR_GATE_DESIGN;
+          dColor = designColor;
           pColor = personalityColor;
           showCircle = true;
         } else if (status.d) {
-          dColor = pColor = COLOR_GATE_DESIGN;
+          dColor = pColor = designColor;
           showCircle = true;
         } else if (status.p) {
           dColor = pColor = personalityColor;
@@ -193,8 +192,8 @@ export function BodyGraph2DSvg({ className = '' }: { className?: string }) {
         const centerId = GATE_BY_NUMBER[gateNum]?.centerId;
         if (centerId) {
           elCircle.style.fill = definedSet.has(centerId)
-            ? COLOR_CIRCLE_DEFINED
-            : COLOR_CIRCLE_UNDEFINED;
+            ? circleDefColor
+            : circleUndefColor;
           elCircle.style.opacity = '1';
         }
       }
@@ -233,7 +232,18 @@ export function BodyGraph2DSvg({ className = '' }: { className?: string }) {
         textTone.style.visibility = visible ? 'visible' : 'hidden';
       }
     });
-  }, [svgMarkup, chart, viewMode, planetToggles, theme]);
+  }, [
+    svgMarkup,
+    chart,
+    viewMode,
+    planetToggles,
+    theme,
+    config.colorDesign,
+    config.colorPersonality,
+    config.colorFloorLight,
+    config.colorCircleDefined,
+    config.colorCircleUndefined,
+  ]);
 
   const handleSvgClick = (e: React.MouseEvent<HTMLDivElement>) => {
     let el = e.target as Element | null;

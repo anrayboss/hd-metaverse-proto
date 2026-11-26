@@ -55,6 +55,30 @@ export interface SceneConfig {
   bodyGraphCamY: number;
   bodyGraphCamZ: number;
   freeRoamSpeed: number;
+  // 全站調色盤（2D 本命圖 / 2D 基礎曼陀羅 / 3D 元宇宙共用）
+  colorDesign: string;
+  colorPersonality: string;
+  colorBoth: string;
+  colorActiveGateBg: string;
+  colorFloorLight: string;
+  colorGridStroke: string;
+  colorCircleDefined: string;
+  colorCircleUndefined: string;
+  colorChannelActive: string;
+  colorChannelInactive: string;
+  colorCenterHead: string;
+  colorCenterAjna: string;
+  colorCenterThroat: string;
+  colorCenterG: string;
+  colorCenterEgo: string;
+  colorCenterSolar: string;
+  colorCenterSpleen: string;
+  colorCenterSacral: string;
+  colorCenterRoot: string;
+  colorQuadInitiation: string;
+  colorQuadCivilization: string;
+  colorQuadDuality: string;
+  colorQuadMutation: string;
 }
 
 export interface HoveredRulerInfo {

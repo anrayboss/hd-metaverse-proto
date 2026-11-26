@@ -123,8 +123,8 @@ function ChannelConduit({
     pulseRef.current.position.copy(extStart).addScaledVector(dir, phase * length);
   });
 
-  const inactiveColor = isLight ? '#cbd5e1' : '#334155';
-  const activeColor = '#f59e0b';
+  const inactiveColor = isLight ? config.colorChannelInactive : '#334155';
+  const activeColor = config.colorChannelActive;
   // 進入人體圖內部空間時，全部通道皆展開為可通行中空管徑，方便從中心直接走進通道
   const radius = isInInterior
     ? config.channelInsideRadius
@@ -318,6 +318,31 @@ function SplineAtriumBodyGraph({
     return { modelRoot: wrapper, gatePositions: gates, centerPositions: centers };
   }, [scene]);
 
+  const centerColorMap: Record<CenterId, string> = useMemo(
+    () => ({
+      head: config.colorCenterHead,
+      ajna: config.colorCenterAjna,
+      throat: config.colorCenterThroat,
+      g: config.colorCenterG,
+      ego: config.colorCenterEgo,
+      solar: config.colorCenterSolar,
+      spleen: config.colorCenterSpleen,
+      sacral: config.colorCenterSacral,
+      root: config.colorCenterRoot,
+    }),
+    [
+      config.colorCenterHead,
+      config.colorCenterAjna,
+      config.colorCenterThroat,
+      config.colorCenterG,
+      config.colorCenterEgo,
+      config.colorCenterSolar,
+      config.colorCenterSpleen,
+      config.colorCenterSacral,
+      config.colorCenterRoot,
+    ]
+  );
+
   // 依據定義中心與啟動閘門即時更新 GLB 材質顏色
   useEffect(() => {
     modelRoot.traverse((obj) => {
@@ -328,10 +353,10 @@ function SplineAtriumBodyGraph({
 
       const centerId = mesh.userData.centerId as CenterId | undefined;
       if (centerId) {
-        const info = centerMap[centerId];
+        const cColor = centerColorMap[centerId];
         const isDef = definedCenters.includes(centerId);
-        mat.color.set(isDef ? info.color : isLight ? '#f8fafc' : '#1e293b');
-        mat.emissive.set(isDef ? info.color : '#64748b');
+        mat.color.set(isDef ? cColor : isLight ? config.colorFloorLight : '#1e293b');
+        mat.emissive.set(isDef ? cColor : '#64748b');
         mat.emissiveIntensity = isInInterior
           ? config.centerEmissiveDefined * 1.35
           : isDef
@@ -349,8 +374,8 @@ function SplineAtriumBodyGraph({
       const gateNum = mesh.userData.gateNumber as number | undefined;
       if (gateNum !== undefined) {
         const isActive = activeGates.includes(gateNum);
-        mat.color.set(isActive ? '#f59e0b' : isLight ? '#e2e8f0' : '#475569');
-        mat.emissive.set(isActive ? '#f59e0b' : '#334155');
+        mat.color.set(isActive ? config.colorChannelActive : isLight ? '#e2e8f0' : '#475569');
+        mat.emissive.set(isActive ? config.colorChannelActive : '#334155');
         mat.emissiveIntensity = isActive ? 0.7 : 0.1;
       }
     });
@@ -359,10 +384,12 @@ function SplineAtriumBodyGraph({
     definedCenters,
     activeGates,
     isLight,
-    centerMap,
+    centerColorMap,
     isInInterior,
     config.centerEmissiveDefined,
     config.centerInteriorOpacity,
+    config.colorFloorLight,
+    config.colorChannelActive,
   ]);
 
   // 排除 5 條整合迴路分支（改由 34、10 接到 57-20 主幹線的匯流點）
@@ -480,7 +507,7 @@ function SplineAtriumBodyGraph({
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.04, 0]}>
         <circleGeometry args={[config.bodyGraphAtriumRadius, 64]} />
         {isLight ? (
-          <meshBasicMaterial color="#ffffff" toneMapped={false} />
+          <meshBasicMaterial color={config.colorFloorLight} toneMapped={false} />
         ) : (
           <meshStandardMaterial color="#090e1c" roughness={0.9} />
         )}

@@ -359,22 +359,39 @@ export function MandalaRing3D() {
 
   const centerMap = useMemo(() => Object.fromEntries(CENTERS.map((c) => [c.id, c])), []);
 
-  // 從 bodygraph.glb 抽取 9 個中心模型幾何並置中正規化，直接用於 3D 曼陀羅中心示意層
+  // 從 bodygraph.glb 抽取 9 個中心模型幾何（套用 world 旋轉使三角形正面完全朝向天空 +Y）
   const { scene: bodyGraphScene } = useGLTF(BODYGRAPH_GLB_URL);
   const centerGeometries = useMemo(() => {
+    bodyGraphScene.updateMatrixWorld(true);
     const map: Partial<Record<CenterId, THREE.BufferGeometry>> = {};
-    bodyGraphScene.traverse((obj) => {
+    const rotMat = new THREE.Matrix4();
+    bodyGraphScene.traverse((obj: THREE.Object3D) => {
       const mesh = obj as THREE.Mesh;
       if (!mesh.isMesh || !mesh.geometry) return;
       const cid = CENTER_NAME_TO_ID[mesh.name.toLowerCase()];
       if (!cid || map[cid]) return;
       const geom = mesh.geometry.clone();
+      // 先套用該物件在 GLB 中的真實世界旋轉（不含位移與縮放），保留躺平人體圖的正確朝上平面
+      rotMat.extractRotation(mesh.matrixWorld);
+      geom.applyMatrix4(rotMat);
       geom.computeBoundingBox();
       if (geom.boundingBox) {
         const size = new THREE.Vector3();
         const center = new THREE.Vector3();
         geom.boundingBox.getSize(size);
         geom.boundingBox.getCenter(center);
+        // 若最薄的軸不是 Y（代表原本直立），額外轉 90° 使三角形正面朝向天空 +Y
+        if (size.z < size.y && size.z <= size.x) {
+          geom.rotateX(-Math.PI / 2);
+          geom.computeBoundingBox();
+          geom.boundingBox.getSize(size);
+          geom.boundingBox.getCenter(center);
+        } else if (size.x < size.y && size.x <= size.z) {
+          geom.rotateZ(Math.PI / 2);
+          geom.computeBoundingBox();
+          geom.boundingBox.getSize(size);
+          geom.boundingBox.getCenter(center);
+        }
         geom.translate(-center.x, -center.y, -center.z);
         const maxDim = Math.max(size.x, size.y, size.z, 0.001);
         const normScale = 2.1 / maxDim;
@@ -384,6 +401,31 @@ export function MandalaRing3D() {
     });
     return map;
   }, [bodyGraphScene]);
+
+  const centerColorMap: Record<CenterId, string> = useMemo(
+    () => ({
+      head: config.colorCenterHead,
+      ajna: config.colorCenterAjna,
+      throat: config.colorCenterThroat,
+      g: config.colorCenterG,
+      ego: config.colorCenterEgo,
+      solar: config.colorCenterSolar,
+      spleen: config.colorCenterSpleen,
+      sacral: config.colorCenterSacral,
+      root: config.colorCenterRoot,
+    }),
+    [
+      config.colorCenterHead,
+      config.colorCenterAjna,
+      config.colorCenterThroat,
+      config.colorCenterG,
+      config.colorCenterEgo,
+      config.colorCenterSolar,
+      config.colorCenterSpleen,
+      config.colorCenterSacral,
+      config.colorCenterRoot,
+    ]
+  );
 
   const discRadius = RING_RADII.hexagram + 3.8;
 
@@ -413,8 +455,8 @@ export function MandalaRing3D() {
 
     const rToPx = (r: number) => (r / discRadius) * half;
 
-    // 1. 3D 地板純白底（深色主題則維持深藍底）
-    ctx.fillStyle = isLight ? '#ffffff' : '#0c1324';
+    // 1. 3D 地板底色（淺色模式吃前端調色盤 colorFloorLight）
+    ctx.fillStyle = isLight ? config.colorFloorLight : '#0c1324';
     ctx.fillRect(0, 0, size, size);
 
     // 2. 統計每個 (gate, line) 的定義狀態 & 每個 gate 內的啟動星體清單（嚴格同星體列表順序）
@@ -457,8 +499,8 @@ export function MandalaRing3D() {
     const rInnerPx = rToPx(RING_RADII.atriumMax);
     const rOuterPx = rToPx(RING_RADII.corridorOuter);
 
-    // 2a. 有定義閘門的柔和走廊底色 #fcf2e4
-    ctx.fillStyle = isLight ? '#fcf2e4' : 'rgba(252, 242, 228, 0.14)';
+    // 2a. 有定義閘門的柔和走廊底色（吃前端調色盤 colorActiveGateBg）
+    ctx.fillStyle = isLight ? config.colorActiveGateBg : 'rgba(252, 242, 228, 0.14)';
     for (const g of MANDALA_GATES) {
       if (!activeSet.has(g.gate)) continue;
       const a0 = g.angleRad - sectorStep / 2;
@@ -489,11 +531,11 @@ export function MandalaRing3D() {
         const aEnd = startAngle - line * lineStep;
         ctx.fillStyle =
           st.d && st.p
-            ? '#e07a22'
+            ? config.colorBoth
             : st.d
-              ? '#f2ba79'
+              ? config.colorDesign
               : isLight
-                ? '#111827'
+                ? config.colorPersonality
                 : '#e2e8f0';
         for (const [rIn, rOut] of lineBlockBands) {
           ctx.beginPath();
@@ -526,7 +568,7 @@ export function MandalaRing3D() {
     }
 
     // 3a-2. 每圈獨立爻線環的 64 條閘門主邊界線（讓每圈爻線環也能清晰辨識閘門分界）
-    ctx.strokeStyle = isLight ? 'rgba(51, 65, 85, 0.72)' : 'rgba(148, 163, 184, 0.48)';
+    ctx.strokeStyle = isLight ? config.colorGridStroke : 'rgba(148, 163, 184, 0.48)';
     for (const [rIn, rOut] of lineBlockBands) {
       const pIn = rToPx(rIn);
       const pOut = rToPx(rOut);
@@ -563,7 +605,7 @@ export function MandalaRing3D() {
       }
     };
 
-    ctx.strokeStyle = isLight ? 'rgba(51, 65, 85, 0.72)' : 'rgba(148, 163, 184, 0.48)';
+    ctx.strokeStyle = isLight ? config.colorGridStroke : 'rgba(148, 163, 184, 0.48)';
 
     // 64 塊層（閘門分隔線寬度同步調參面板 gateDividerWidth）
     const gateAngles = MANDALA_GATES.map((g) => g.angleRad - sectorStep / 2);
@@ -613,7 +655,7 @@ export function MandalaRing3D() {
       { r: 81.8, w: 2.2 },
       { r: 88.8, w: 2.4 },
     ];
-    ctx.strokeStyle = isLight ? 'rgba(51, 65, 85, 0.72)' : 'rgba(148, 163, 184, 0.48)';
+    ctx.strokeStyle = isLight ? config.colorGridStroke : 'rgba(148, 163, 184, 0.48)';
     for (const ring of ringDefs) {
       ctx.lineWidth = ring.w;
       ctx.beginPath();
@@ -633,7 +675,7 @@ export function MandalaRing3D() {
         if (rSym < 22.8) return;
         const px = half + Math.cos(g.angleRad) * rToPx(rSym);
         const py = half + Math.sin(g.angleRad) * rToPx(rSym);
-        ctx.fillStyle = entry.side === 'd' ? '#e59a43' : isLight ? '#0f172a' : '#f1f5f9';
+        ctx.fillStyle = entry.side === 'd' ? config.colorDesign : isLight ? config.colorPersonality : '#f1f5f9';
         ctx.fillText(entry.sym, px, py);
       });
     }
@@ -643,7 +685,22 @@ export function MandalaRing3D() {
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.needsUpdate = true;
     return tex;
-  }, [chart.activeGates, chart.design, chart.personality, viewMode, planetToggles, isLight, discRadius, config.gateDividerWidth]);
+  }, [
+    chart.activeGates,
+    chart.design,
+    chart.personality,
+    viewMode,
+    planetToggles,
+    isLight,
+    discRadius,
+    config.gateDividerWidth,
+    config.colorFloorLight,
+    config.colorActiveGateBg,
+    config.colorDesign,
+    config.colorPersonality,
+    config.colorBoth,
+    config.colorGridStroke,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -754,7 +811,7 @@ export function MandalaRing3D() {
           centerMarkerY={config.centerMarkerY}
           centerMarkerScale={config.centerMarkerScale}
           codonTokenY={config.codonTokenY}
-          centerInfo={centerMap[gate.centerId]}
+          centerInfo={{ ...centerMap[gate.centerId], color: centerColorMap[gate.centerId] }}
           centerGeometry={centerGeometries[gate.centerId]}
           onEnterCorridor={(gateNum) => enterCorridorByGate(gateNum, 'in', 85)}
         />

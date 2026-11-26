@@ -21,13 +21,6 @@ const ZODIAC_RING_3D_ORDER: Array<{ name: string; symbol: string }> = [
   { symbol: '♑', name: '魔羯' },
 ];
 
-const QUADRANT_NUM_COLOR: Record<QuadrantId, string> = {
-  initiation: '#a6342a', // 第一象限（紅棕）
-  civilization: '#3f7337', // 第二象限（綠）
-  duality: '#a35d1e', // 第三象限（橘棕）
-  mutation: '#24486b', // 第四象限（深藍）
-};
-
 const CX = 500;
 const CY = 500;
 const R_HEX_CENTER = 452; // 最外圈易經卦象（與爻線填色距離縮小一半，更貼近曼陀羅，無任何包覆線條）
@@ -74,17 +67,23 @@ export function BasicMandala2D() {
   const viewMode = useWorldStore((s) => s.viewMode);
   const planetToggles = useWorldStore((s) => s.planetToggles);
   const theme = useWorldStore((s) => s.theme);
-  const gateDividerWidth = useSceneConfigStore((s) => s.config.gateDividerWidth);
+  const config = useSceneConfigStore((s) => s.config);
   const setDisplayMode = useWorldStore((s) => s.setDisplayMode);
   const enterCorridorByGate = useWorldStore((s) => s.enterCorridorByGate);
 
   const isLight = theme === 'light';
-  const strokeColor = isLight ? '#334155' : '#475569';
+  const strokeColor = isLight ? config.colorGridStroke : '#475569';
   const softStroke = isLight ? 'rgba(100, 116, 139, 0.35)' : 'rgba(148, 163, 184, 0.25)';
   const tickStroke = isLight ? 'rgba(100, 116, 139, 0.5)' : 'rgba(148, 163, 184, 0.35)';
-  const textPrimary = isLight ? '#0f172a' : '#f1f5f9';
-  const ringBg = isLight ? '#ffffff' : '#0f172a';
-  const gateDividerStroke = Math.max(0.6, gateDividerWidth * 0.42);
+  const textPrimary = isLight ? config.colorPersonality : '#f1f5f9';
+  const ringBg = isLight ? config.colorFloorLight : '#0f172a';
+  const gateDividerStroke = Math.max(0.6, config.gateDividerWidth * 0.42);
+  const quadNumColor: Record<QuadrantId, string> = {
+    initiation: config.colorQuadInitiation,
+    civilization: config.colorQuadCivilization,
+    duality: config.colorQuadDuality,
+    mutation: config.colorQuadMutation,
+  };
 
   // 1. 每個 (gate, line) 的定義狀態（給 6 爻小弧塊填色用）
   // 2. 每個 gate 內的啟動星體清單（嚴格依 PLANET_ORDER_ALL 順序，放射狀由外向內排在星座環與人體圖之間）
@@ -164,7 +163,7 @@ export function BasicMandala2D() {
             <path
               key={`gate-bg-${gate.gate}`}
               d={describeArcWedge(R_GATE_INNER, R_LINE_BAND_INNER, a0, a1)}
-              fill={isLight ? '#fcf2e4' : 'rgba(242, 186, 121, 0.16)'}
+              fill={isLight ? config.colorActiveGateBg : 'rgba(242, 186, 121, 0.16)'}
             />
           );
         })}
@@ -179,11 +178,11 @@ export function BasicMandala2D() {
             const aEnd = startAngle - line * LINE_RAD;
             const fill =
               st.d && st.p
-                ? '#e07a22'
+                ? config.colorBoth
                 : st.d
-                  ? '#f2ba79'
+                  ? config.colorDesign
                   : isLight
-                    ? '#111827'
+                    ? config.colorPersonality
                     : '#e2e8f0';
             return (
               <path
@@ -284,7 +283,7 @@ export function BasicMandala2D() {
                 dominantBaseline="middle"
                 fontSize="17"
                 fontWeight={700}
-                fill={entry.side === 'd' ? '#e59a43' : textPrimary}
+                fill={entry.side === 'd' ? config.colorDesign : textPrimary}
               >
                 {entry.sym}
               </text>
@@ -299,7 +298,7 @@ export function BasicMandala2D() {
           const [numX, numY] = polar((R_GATE_INNER + R_LINE_BAND_INNER) / 2, a);
           const [hexX, hexY] = polar(R_HEX_CENTER, a);
           const rotDeg = (a * 180) / Math.PI + 90;
-          const numColor = isLight ? QUADRANT_NUM_COLOR[gate.quadrant] : isActive ? '#fde68a' : '#cbd5e1';
+          const numColor = isLight ? quadNumColor[gate.quadrant] : isActive ? '#fde68a' : '#cbd5e1';
 
           return (
             <g
