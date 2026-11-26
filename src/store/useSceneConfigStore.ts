@@ -5,6 +5,7 @@ export interface SceneConfig {
   // 地板與曼陀羅
   floorY: number;
   floorDepth: number;
+  gateDividerWidth: number;
   ringLabelY: number;
   hexagramBaseY: number;
   hexagramY: number;

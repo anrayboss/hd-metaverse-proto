@@ -14,6 +14,7 @@ export function SceneStudioPanel() {
       {
         floorY: { value: DEFAULT_SCENE_CONFIG.floorY, min: -4, max: 2, step: 0.05, label: '地板高度 Y' },
         floorDepth: { value: DEFAULT_SCENE_CONFIG.floorDepth, min: 0.4, max: 8, step: 0.1, label: '圓盤厚度' },
+        gateDividerWidth: { value: DEFAULT_SCENE_CONFIG.gateDividerWidth, min: 0.5, max: 10, step: 0.2, label: '閘門分隔線粗細' },
         ringLabelY: { value: DEFAULT_SCENE_CONFIG.ringLabelY, min: 0, max: 4, step: 0.05, label: '象限/神格/星座/八卦 Y' },
         hexagramBaseY: { value: DEFAULT_SCENE_CONFIG.hexagramBaseY, min: 0, max: 4, step: 0.05, label: '卦象底座 Y' },
         hexagramY: { value: DEFAULT_SCENE_CONFIG.hexagramY, min: 0.2, max: 6, step: 0.05, label: '卦象高度 Y' },
@@ -105,7 +106,7 @@ export function SceneStudioPanel() {
 
   return (
     <>
-      <Leva collapsed={false} titleBar={{ title: '🎛️ 場景調參 Studio' }} />
+      <Leva collapsed={true} titleBar={{ title: '🎛️ 場景調參 Studio', drag: true, filter: true }} />
       {hoveredRuler && (
         <div
           className="ruler-badge"

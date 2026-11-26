@@ -470,7 +470,8 @@ export const MANDALA_GATES: GateInfo[] = RAVE_MANDALA_ORDER.map((gate, wheelInde
   const codonInfo = findCodonRingForGate(gate);
 
   const godheadIdx = Math.floor(((wheelIndex + 2) % 64) / 4);
-  const zodiacIdx = Math.floor((((wheelIndex + 2) % 64) / 64) * 12) % 12;
+  // 對齊天蠍與射手交界 = Gate 14 (52) 與 Gate 34 (53) 交界（52.5 => offset +5/6）
+  const zodiacIdx = Math.floor((((wheelIndex + 5 / 6 + 64) % 64) / 64) * 12) % 12;
   const trigramIdx = Math.floor(((wheelIndex - 4 + 64) % 64) / 8);
 
   return {

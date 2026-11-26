@@ -1510,3 +1510,24 @@ body,
     gap: 8px;
   }
 }
+
+
+/* 調參面板 (Leva) 起始位置改至左上角「人類設計宇宙」標題正下方 */
+#leva__root > div {
+  top: 76px !important;
+  left: 16px !important;
+  right: auto !important;
+}
+
+.controls-hint__interior-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.controls-hint__exit-btn {
+  padding: 6px 12px !important;
+  font-size: 12px !important;
+}

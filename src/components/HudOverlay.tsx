@@ -346,31 +346,6 @@ export function HudOverlay() {
         </section>
       )}
 
-      {/* 人體圖內部自由漫遊提示條（九中心與通道連通空間） */}
-      {displayMode === 'universe-3d' && interiorSpace && (
-        <section className="guide-panel">
-          <span className="guide-badge guide-badge--cyan">
-            人體圖內部自由漫遊｜
-            {interiorSpace.type === 'free'
-              ? interiorSpace.fromGate
-                ? `從 Gate ${interiorSpace.fromGate} 走廊無縫進入`
-                : '無縫進入中庭空間'
-              : interiorSpace.type === 'center'
-                ? `起點：${CENTERS.find((c) => c.id === interiorSpace.centerId)?.name}`
-                : `起點：${interiorSpace.channelId} ${interiorSpace.name}`}
-          </span>
-          <p style={{ marginTop: 6 }}>
-            滑鼠拖曳 360° 轉頭，<code>W A S D</code> 自由穿梭九中心與通道；走出外緣將無縫銜接對應閘門走廊，按{' '}
-            <code>E</code> 飛高或 <code>Esc</code> 退出。
-          </p>
-          <div className="guide-actions" style={{ marginTop: 10 }}>
-            <button type="button" className="btn-primary" onClick={exitInteriorSpace}>
-              退出人體圖內部空間 (Esc)
-            </button>
-          </div>
-        </section>
-      )}
-
       {/* Stages 1 & 3 */}
       {displayMode === 'universe-3d' && !interiorSpace && (stage === 'red-sun' || stage === 'bodygraph') && (
         <section className="guide-panel">
@@ -479,14 +454,31 @@ export function HudOverlay() {
         </section>
       )}
 
-      {displayMode === 'universe-3d' && stage === 'free-roam' && (
+      {displayMode === 'universe-3d' && (stage === 'free-roam' || interiorSpace) && (
         <div className="controls-hint">
-          <span>
-            <strong>鳥瞰自由探索</strong>｜點擊任一<strong>卦象或 1/64 扇形空間</strong>即進入該閘門走廊
-          </span>
-          <span>
-            <code>W A S D</code> 移動 · <code>Q / E</code> 升降 · 滑鼠拖曳／滾輪縮放
-          </span>
+          {interiorSpace ? (
+            <div className="controls-hint__interior-row">
+              <span>
+                <strong>人體圖內部漫遊</strong>｜<code>W A S D</code> 穿梭九中心與通道 · <code>Q / E</code> 升降
+              </span>
+              <button
+                type="button"
+                className="btn-primary controls-hint__exit-btn"
+                onClick={exitInteriorSpace}
+              >
+                退出人體圖內部空間 (Esc)
+              </button>
+            </div>
+          ) : (
+            <>
+              <span>
+                <strong>鳥瞰自由探索</strong>｜點擊任一<strong>卦象或 1/64 扇形空間</strong>即進入該閘門走廊
+              </span>
+              <span>
+                <code>W A S D</code> 移動 · <code>Q / E</code> 升降 · 滑鼠拖曳／滾輪縮放
+              </span>
+            </>
+          )}
         </div>
       )}
 

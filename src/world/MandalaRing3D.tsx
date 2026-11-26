@@ -11,6 +11,7 @@ import {
   RING_RADII,
 } from '../data/mandalaData';
 import { ENABLE_SUN_GUIDE, useWorldStore } from '../store/useWorldStore';
+import { getActivePlanetList } from '../engine/hdCalculator';
 import { useSceneConfigStore } from '../store/useSceneConfigStore';
 
 interface GateHexagramProps {
@@ -279,6 +280,8 @@ function GateHexagram({
  */
 export function MandalaRing3D() {
   const chart = useWorldStore((s) => s.chart);
+  const viewMode = useWorldStore((s) => s.viewMode);
+  const planetToggles = useWorldStore((s) => s.planetToggles);
   const selected = useWorldStore((s) => s.selected);
   const enterCorridorByGate = useWorldStore((s) => s.enterCorridorByGate);
   const theme = useWorldStore((s) => s.theme);
@@ -303,7 +306,7 @@ export function MandalaRing3D() {
     return geom;
   }, [config.floorDepth, discRadius]);
 
-  // 直接繪製於地板頂面的高解析貼圖：包含定義閘門底色 (#fcf2e4)、64 等分放射分隔線與 10 層同心圓線
+  // 直接繪製於地板頂面的高解析貼圖：包含 6 爻均分放射線、定義閘門與爻線填色、加粗閘門分隔線與 10 層同心圓線
   const floorTexture = useMemo(() => {
     const size = 2048;
     const half = size / 2;
@@ -319,13 +322,40 @@ export function MandalaRing3D() {
     ctx.fillStyle = isLight ? '#ffffff' : '#0c1324';
     ctx.fillRect(0, 0, size, size);
 
-    // 2. 跑圖有定義（啟動）的閘門走廊填上底色 #fcf2e4
+    // 2. 統計每個 (gate, line) 的意識 / 無意識定義狀態（逆時針 1..6 爻）
+    const activeLines = new Map<string, { d: boolean; p: boolean }>();
+    const activePlanets = getActivePlanetList(planetToggles);
+    if (chart.design && chart.personality) {
+      for (const body of activePlanets) {
+        if (viewMode === 0 || viewMode === 1) {
+          const item = chart.design[body];
+          if (item) {
+            const key = `${item.gate}.${item.line}`;
+            const cur = activeLines.get(key) || { d: false, p: false };
+            cur.d = true;
+            activeLines.set(key, cur);
+          }
+        }
+        if (viewMode === 2 || viewMode === 1) {
+          const item = chart.personality[body];
+          if (item) {
+            const key = `${item.gate}.${item.line}`;
+            const cur = activeLines.get(key) || { d: false, p: false };
+            cur.p = true;
+            activeLines.set(key, cur);
+          }
+        }
+      }
+    }
+
     const activeSet = new Set(chart.activeGates);
     const sectorStep = (Math.PI * 2) / 64;
+    const lineStep = sectorStep / 6;
     const rInnerPx = rToPx(RING_RADII.atriumMax);
     const rOuterPx = rToPx(RING_RADII.corridorOuter);
 
-    ctx.fillStyle = isLight ? '#fcf2e4' : 'rgba(252, 242, 228, 0.16)';
+    // 2a. 有定義閘門的淡底色
+    ctx.fillStyle = isLight ? 'rgba(252, 242, 228, 0.55)' : 'rgba(252, 242, 228, 0.1)';
     for (const g of MANDALA_GATES) {
       if (!activeSet.has(g.gate)) continue;
       const a0 = g.angleRad - sectorStep / 2;
@@ -337,15 +367,58 @@ export function MandalaRing3D() {
       ctx.fill();
     }
 
-    // 3. 64 等分 1/64 閘門放射分隔線（從 R=22 貫穿至 R=88）
-    ctx.strokeStyle = isLight ? 'rgba(100, 116, 139, 0.52)' : 'rgba(148, 163, 184, 0.35)';
-    ctx.lineWidth = 1.6;
+    // 2b. 有定義的「閘門爻線（1/6 等份，逆時針 1→6 爻）」從圓心一路延伸至阿拉伯數字與卦象之間填色
+    // 注意：angleRad 隨 wheelIndex 增加而遞減，因此逆時針 1..6 爻是從 angleRad + sectorStep/2 往 angleRad - sectorStep/2 遞減
+    for (const g of MANDALA_GATES) {
+      const startAngle = g.angleRad + sectorStep / 2;
+      for (let line = 1; line <= 6; line++) {
+        const st = activeLines.get(`${g.gate}.${line}`);
+        if (!st) continue;
+        const aStart = startAngle - (line - 1) * lineStep;
+        const aEnd = startAngle - line * lineStep;
+        ctx.fillStyle =
+          st.d && st.p
+            ? isLight
+              ? 'rgba(224, 122, 34, 0.42)'
+              : 'rgba(242, 186, 121, 0.48)'
+            : st.d
+              ? isLight
+                ? 'rgba(242, 186, 121, 0.45)'
+                : 'rgba(242, 186, 121, 0.34)'
+              : isLight
+                ? 'rgba(100, 116, 139, 0.26)'
+                : 'rgba(203, 213, 225, 0.28)';
+        ctx.beginPath();
+        ctx.moveTo(half, half);
+        ctx.arc(half, half, rOuterPx, aEnd, aStart, false);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+
+    // 3a. 384 條 6 等分爻線細放射線（從圓心延伸到阿拉伯數字與卦象之間）
+    ctx.strokeStyle = isLight ? 'rgba(148, 163, 184, 0.32)' : 'rgba(148, 163, 184, 0.18)';
+    ctx.lineWidth = 0.75;
+    for (const g of MANDALA_GATES) {
+      const startAngle = g.angleRad + sectorStep / 2;
+      for (let line = 1; line < 6; line++) {
+        const a = startAngle - line * lineStep;
+        ctx.beginPath();
+        ctx.moveTo(half, half);
+        ctx.lineTo(half + Math.cos(a) * rOuterPx, half + Math.sin(a) * rOuterPx);
+        ctx.stroke();
+      }
+    }
+
+    // 3b. 64 等分 1/64 閘門放射分隔線（從圓心延伸至數字與卦象間，寬度由前端調參面板控制）
+    ctx.strokeStyle = isLight ? 'rgba(71, 85, 105, 0.65)' : 'rgba(148, 163, 184, 0.45)';
+    ctx.lineWidth = config.gateDividerWidth;
     for (const g of MANDALA_GATES) {
       const boundaryAngle = g.angleRad - sectorStep / 2;
       const cos = Math.cos(boundaryAngle);
       const sin = Math.sin(boundaryAngle);
       ctx.beginPath();
-      ctx.moveTo(half + cos * rInnerPx, half + sin * rInnerPx);
+      ctx.moveTo(half, half);
       ctx.lineTo(half + cos * rOuterPx, half + sin * rOuterPx);
       ctx.stroke();
     }
@@ -376,7 +449,7 @@ export function MandalaRing3D() {
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.needsUpdate = true;
     return tex;
-  }, [chart.activeGates, isLight, discRadius]);
+  }, [chart.activeGates, chart.design, chart.personality, viewMode, planetToggles, isLight, discRadius, config.gateDividerWidth]);
 
   useEffect(() => {
     return () => {
@@ -405,9 +478,9 @@ export function MandalaRing3D() {
       const a = -Math.PI / 2 - ((midIdx - 57.5) / 64) * Math.PI * 2;
       items.push({ key: `gh-${i}`, text: g.godhead, r: RING_RADII.godhead, angle: a, size: 1.55 });
     }
-    // 十二星座（每 ~5.33 閘門 1 個）
+    // 十二星座（精準對齊天蠍與射手交界 = Gate 14 與 Gate 34 交界）
     for (let i = 0; i < 12; i++) {
-      const midIdx = ((i + 0.5) * (64 / 12) - 2 + 64) % 64;
+      const midIdx = ((i + 0.5) * (64 / 12) - 5 / 6 + 64) % 64;
       const g = MANDALA_GATES[Math.floor(midIdx)];
       const a = -Math.PI / 2 - ((midIdx - 57.5) / 64) * Math.PI * 2;
       items.push({ key: `zod-${i}`, text: g.zodiac, r: RING_RADII.zodiac, angle: a, size: 1.45 });
