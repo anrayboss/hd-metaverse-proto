@@ -20,6 +20,7 @@ export function UniverseScene() {
     <div className="canvas-wrapper">
       <Canvas
         camera={{ position: [0, config.birdEyeHeight, 0.1], fov: 48, near: 0.05, far: 620 }}
+        gl={{ antialias: true, logarithmicDepthBuffer: true }}
         dpr={[1, 2]}
         onPointerMissed={() => clearSelection()}
       >

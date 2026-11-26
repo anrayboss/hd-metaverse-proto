@@ -302,19 +302,19 @@ function GateHexagram({
         customGeometry={centerGeometry}
       />
 
-      {/* 第 9 層：密碼子環 Token 珠（旋風／奇蹟／啟迪者之環為雙圓球＋短 bar 連接） */}
+      {/* 第 9 層：密碼子環 Token 珠（旋風／奇蹟／啟迪者之環為雙圓球＋短 bar 沿圓環切線方向排列） */}
       {DOUBLE_ORB_CODON_RINGS.has(gate.codonRing) ? (
-        <group position={codonPos} rotation={[0, -gate.angleRad, 0]}>
-          <mesh position={[-0.62, 0, 0]}>
-            <sphereGeometry args={[0.48, 12, 12]} />
+        <group position={codonPos} rotation={[0, -gate.angleRad + Math.PI / 2, 0]}>
+          <mesh position={[-0.48, 0, 0]}>
+            <sphereGeometry args={[0.42, 12, 12]} />
             <meshStandardMaterial
               color={gate.codonColor}
               emissive={gate.codonColor}
               emissiveIntensity={0.4}
             />
           </mesh>
-          <mesh position={[0.62, 0, 0]}>
-            <sphereGeometry args={[0.48, 12, 12]} />
+          <mesh position={[0.48, 0, 0]}>
+            <sphereGeometry args={[0.42, 12, 12]} />
             <meshStandardMaterial
               color={gate.codonColor}
               emissive={gate.codonColor}
@@ -322,7 +322,7 @@ function GateHexagram({
             />
           </mesh>
           <mesh rotation={[0, 0, Math.PI / 2]}>
-            <cylinderGeometry args={[0.16, 0.16, 1.15, 10]} />
+            <cylinderGeometry args={[0.14, 0.14, 0.92, 10]} />
             <meshStandardMaterial
               color={gate.codonColor}
               emissive={gate.codonColor}
@@ -505,19 +505,39 @@ export function MandalaRing3D() {
       }
     }
 
-    // 3a. 最外圈（88.8..92.8）的 384 條 6 爻細刻度線（開放式不封外圈）
-    ctx.strokeStyle = isLight ? 'rgba(100, 116, 139, 0.45)' : 'rgba(148, 163, 184, 0.28)';
+    // 3a. 每圈爻線填色環皆繪製 384 條 6 等分爻線細刻度線（每個閘門一分為六，滿滿細節！）
+    ctx.strokeStyle = isLight ? 'rgba(100, 116, 139, 0.48)' : 'rgba(148, 163, 184, 0.32)';
     ctx.lineWidth = 0.85;
-    const rTickInPx = rToPx(88.8);
-    for (const g of MANDALA_GATES) {
-      const startAngle = g.angleRad + sectorStep / 2;
-      for (let line = 1; line < 6; line++) {
-        const a = startAngle - line * lineStep;
+    for (const [rIn, rOut] of lineBlockBands) {
+      const pIn = rToPx(rIn);
+      const pOut = rToPx(rOut);
+      for (const g of MANDALA_GATES) {
+        const startAngle = g.angleRad + sectorStep / 2;
+        for (let line = 1; line < 6; line++) {
+          const a = startAngle - line * lineStep;
+          const cos = Math.cos(a);
+          const sin = Math.sin(a);
+          ctx.beginPath();
+          ctx.moveTo(half + cos * pIn, half + sin * pIn);
+          ctx.lineTo(half + cos * pOut, half + sin * pOut);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // 3a-2. 每圈獨立爻線環的 64 條閘門主邊界線（讓每圈爻線環也能清晰辨識閘門分界）
+    ctx.strokeStyle = isLight ? 'rgba(51, 65, 85, 0.72)' : 'rgba(148, 163, 184, 0.48)';
+    for (const [rIn, rOut] of lineBlockBands) {
+      const pIn = rToPx(rIn);
+      const pOut = rToPx(rOut);
+      ctx.lineWidth = Math.max(1.8, config.gateDividerWidth * 0.75);
+      for (const g of MANDALA_GATES) {
+        const a = g.angleRad - sectorStep / 2;
         const cos = Math.cos(a);
         const sin = Math.sin(a);
         ctx.beginPath();
-        ctx.moveTo(half + cos * rTickInPx, half + sin * rTickInPx);
-        ctx.lineTo(half + cos * rOuterPx, half + sin * rOuterPx);
+        ctx.moveTo(half + cos * pIn, half + sin * pIn);
+        ctx.lineTo(half + cos * pOut, half + sin * pOut);
         ctx.stroke();
       }
     }
@@ -673,8 +693,8 @@ export function MandalaRing3D() {
 
   return (
     <group>
-      {/* 大阪世博大屋根扁平厚實心圓盤底盤（頂面精確切齊 config.floorY） */}
-      <mesh geometry={grandRingGeometry} position={[0, config.floorY, 0]} receiveShadow>
+      {/* 大阪世博大屋根扁平厚實心圓盤底盤（略低於貼圖面 0.16m，徹底消除鳥瞰 Z-fighting 破圖） */}
+      <mesh geometry={grandRingGeometry} position={[0, config.floorY - 0.16, 0]} receiveShadow>
         <meshStandardMaterial
           color={isLight ? '#ffffff' : '#0c1324'}
           metalness={isLight ? 0.05 : 0.45}
@@ -682,29 +702,18 @@ export function MandalaRing3D() {
         />
       </mesh>
 
-      {/* 直接繪製於地板頂面的曼陀羅貼圖（定義閘門 #fcf2e4 底色 + 64 放射分隔線 + 10 層同心圓） */}
+      {/* 直接繪製於地板頂面的曼陀羅貼圖（與實心底盤拉開 0.16m 深度間距，鳥瞰零破圖） */}
       {floorTexture && (
         <mesh
           rotation={[-Math.PI / 2, 0, 0]}
-          position={[0, config.floorY + 0.015, 0]}
+          position={[0, config.floorY, 0]}
           receiveShadow
         >
-          <circleGeometry args={[discRadius - 0.05, 128]} />
+          <circleGeometry args={[discRadius, 128]} />
           {isLight ? (
-            <meshBasicMaterial
-              map={floorTexture}
-              toneMapped={false}
-              polygonOffset
-              polygonOffsetFactor={-1}
-            />
+            <meshBasicMaterial map={floorTexture} toneMapped={false} />
           ) : (
-            <meshStandardMaterial
-              map={floorTexture}
-              roughness={0.88}
-              metalness={0.02}
-              polygonOffset
-              polygonOffsetFactor={-1}
-            />
+            <meshStandardMaterial map={floorTexture} roughness={0.88} metalness={0.02} />
           )}
         </mesh>
       )}
