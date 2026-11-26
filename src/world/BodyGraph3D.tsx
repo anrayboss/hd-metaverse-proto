@@ -55,7 +55,9 @@ function ChannelConduit({
   activeA,
   activeB,
   isLight,
-  isInsideThis,
+  isInInterior,
+  extendStart = 0.35,
+  extendEnd = 0.35,
   onSelectChannel,
 }: {
   channelId: string;
@@ -66,15 +68,22 @@ function ChannelConduit({
   activeA: boolean;
   activeB: boolean;
   isLight: boolean;
-  isInsideThis: boolean;
+  isInInterior: boolean;
+  extendStart?: number;
+  extendEnd?: number;
   onSelectChannel: () => void;
 }) {
   const pulseRef = useRef<THREE.Mesh>(null);
   const config = useSceneConfigStore((s) => s.config);
   const bothActive = activeA && activeB;
 
-  const { segA, segB, dir, length, ringPositions, fullQuat } = useMemo(() => {
-    const mid = start.clone().add(end).multiplyScalar(0.5);
+  const { segA, segB, dir, length, ringPositions, fullQuat, extStart } = useMemo(() => {
+    const rawVec = end.clone().sub(start);
+    const d = rawVec.clone().normalize();
+    // 兩端往中心內部微幅延伸，讓中空通道管線與九中心留空空間無縫連通
+    const sPt = start.clone().addScaledVector(d, -extendStart);
+    const ePt = end.clone().addScaledVector(d, extendEnd);
+    const mid = sPt.clone().add(ePt).multiplyScalar(0.5);
     const buildSeg = (p1: THREE.Vector3, p2: THREE.Vector3) => {
       const vec = p2.clone().sub(p1);
       const len = vec.length();
@@ -85,39 +94,39 @@ function ChannelConduit({
       );
       return { center, quat, len };
     };
-    const fullVec = end.clone().sub(start);
+    const fullVec = ePt.clone().sub(sPt);
     const len = fullVec.length();
-    const d = fullVec.clone().normalize();
     const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), d);
 
-    // 管內導光環（讓攝影機進入管線內部時有強烈空間透視感）
+    // 管內導光環（讓攝影機在中心與通道間穿梭時清楚辨識連通空間）
     const ringCount = Math.max(2, Math.min(7, Math.floor(len / 1.4)));
     const rings: THREE.Vector3[] = [];
     for (let i = 1; i <= ringCount; i++) {
-      rings.push(start.clone().addScaledVector(d, (len * i) / (ringCount + 1)));
+      rings.push(sPt.clone().addScaledVector(d, (len * i) / (ringCount + 1)));
     }
 
     return {
-      segA: buildSeg(start, mid),
-      segB: buildSeg(mid, end),
+      segA: buildSeg(sPt, mid),
+      segB: buildSeg(mid, ePt),
       dir: d,
       length: len,
       ringPositions: rings,
       fullQuat: quat,
+      extStart: sPt,
     };
-  }, [start, end]);
+  }, [start, end, extendStart, extendEnd]);
 
   useFrame((state) => {
     if (!pulseRef.current) return;
     const speed = bothActive ? config.channelPulseSpeed : config.channelPulseSpeed * 0.5;
     const phase = (state.clock.elapsedTime * speed + (gates[0] % 7) * 0.13) % 1;
-    pulseRef.current.position.copy(start).addScaledVector(dir, phase * length);
+    pulseRef.current.position.copy(extStart).addScaledVector(dir, phase * length);
   });
 
   const inactiveColor = isLight ? '#cbd5e1' : '#334155';
   const activeColor = '#f59e0b';
-  // 攝影機在管內時使用管內穿梭管徑，外部依定義與否套用可調管徑
-  const radius = isInsideThis
+  // 進入人體圖內部空間時，全部通道皆展開為可通行中空管徑，方便從中心直接走進通道
+  const radius = isInInterior
     ? config.channelInsideRadius
     : bothActive
       ? config.channelActiveRadius
@@ -127,14 +136,17 @@ function ChannelConduit({
     <group
       name={`Channel_${channelId}_${channelName}`}
       onClick={(e) => {
+        if (isInInterior) return;
         e.stopPropagation();
         onSelectChannel();
       }}
       onPointerOver={(e) => {
+        if (isInInterior) return;
         e.stopPropagation();
         document.body.style.cursor = 'pointer';
       }}
       onPointerOut={() => {
+        if (isInInterior) return;
         document.body.style.cursor = 'auto';
       }}
     >
@@ -148,6 +160,8 @@ function ChannelConduit({
           roughness={0.35}
           metalness={0.25}
           side={THREE.DoubleSide}
+          transparent={isInInterior}
+          opacity={isInInterior ? config.centerInteriorOpacity : 1}
         />
       </mesh>
 
@@ -161,17 +175,19 @@ function ChannelConduit({
           roughness={0.35}
           metalness={0.25}
           side={THREE.DoubleSide}
+          transparent={isInInterior}
+          opacity={isInInterior ? config.centerInteriorOpacity : 1}
         />
       </mesh>
 
-      {/* 管線內部結構導光環（攝影機進入管內時清晰可見空間尺度） */}
+      {/* 管線內部結構導光環（攝影機進入內部時清晰可見空間尺度） */}
       {ringPositions.map((rp, idx) => (
         <mesh key={idx} position={rp} quaternion={fullQuat}>
           <torusGeometry args={[radius * 0.92, 0.018, 8, 24]} />
           <meshBasicMaterial
             color={bothActive ? '#fef08a' : isLight ? '#0284c7' : '#7dd3fc'}
             transparent
-            opacity={isInsideThis ? Math.max(0.65, config.channelRingOpacity) : config.channelRingOpacity}
+            opacity={isInInterior ? Math.max(0.6, config.channelRingOpacity) : config.channelRingOpacity}
           />
         </mesh>
       ))}
@@ -180,8 +196,8 @@ function ChannelConduit({
       <mesh ref={pulseRef}>
         <sphereGeometry
           args={[
-            isInsideThis
-              ? config.channelPulseSize * 0.4
+            isInInterior
+              ? config.channelPulseSize * 0.35
               : bothActive
                 ? config.channelPulseSize
                 : config.channelPulseSize * 0.65,
@@ -212,8 +228,8 @@ function SplineAtriumBodyGraph({
   activeGates,
   isLight,
   yOffset,
+  isInInterior,
   interiorCenterId,
-  interiorChannelId,
   onSelectCenter,
   onSelectGate,
   onSelectChannel,
@@ -222,13 +238,14 @@ function SplineAtriumBodyGraph({
   activeGates: number[];
   isLight: boolean;
   yOffset: number;
+  isInInterior: boolean;
   interiorCenterId: CenterId | null;
-  interiorChannelId: string | null;
   onSelectCenter: (c: CenterInfo, worldPos: [number, number, number]) => void;
   onSelectGate: (gateNum: number, worldPos: [number, number, number]) => void;
   onSelectChannel: (
     channelId: string,
     name: string,
+    description: string,
     gates: [number, number],
     start: [number, number, number],
     end: [number, number, number]
@@ -313,19 +330,18 @@ function SplineAtriumBodyGraph({
       if (centerId) {
         const info = centerMap[centerId];
         const isDef = definedCenters.includes(centerId);
-        const isInsideThisCenter = interiorCenterId === centerId;
         mat.color.set(isDef ? info.color : isLight ? '#f8fafc' : '#1e293b');
         mat.emissive.set(isDef ? info.color : '#64748b');
-        mat.emissiveIntensity = isInsideThisCenter
-          ? config.centerEmissiveDefined * 1.5
+        mat.emissiveIntensity = isInInterior
+          ? config.centerEmissiveDefined * 1.35
           : isDef
             ? config.centerEmissiveDefined
             : 0.05;
         mat.roughness = 0.45;
-        // 雙面渲染：讓攝影機飛進九中心內部時可以看到完整立體內牆（不會因背面剔除消失）
+        // 雙面渲染：進入人體圖內部時全部九中心皆呈留空內壁，方便從中心直接走進通道、反之亦然
         mat.side = THREE.DoubleSide;
-        mat.transparent = isInsideThisCenter;
-        mat.opacity = isInsideThisCenter ? config.centerInteriorOpacity : 1;
+        mat.transparent = isInInterior;
+        mat.opacity = isInInterior ? config.centerInteriorOpacity : 1;
         mat.needsUpdate = true;
         return;
       }
@@ -344,7 +360,7 @@ function SplineAtriumBodyGraph({
     activeGates,
     isLight,
     centerMap,
-    interiorCenterId,
+    isInInterior,
     config.centerEmissiveDefined,
     config.centerInteriorOpacity,
   ]);
@@ -370,6 +386,7 @@ function SplineAtriumBodyGraph({
     const branches: Array<{
       id: string;
       name: string;
+      description: string;
       gates: [number, number];
       start: THREE.Vector3;
       end: THREE.Vector3;
@@ -386,8 +403,9 @@ function SplineAtriumBodyGraph({
       const junctionLit = is34Active && (anyMainActive || activeGates.includes(10));
       branches.push({
         id: '34-junction',
-        name: '34 匯流至 57-20 主幹線（魅力／力量／探索）',
-        gates: [34, 20],
+        name: '34 匯流（即知即行／自給自足／自我砥礪）',
+        description: '由 34 閘門匯流至 57-20 主幹線，串聯 34-20、34-57 與 34-10',
+        gates: [34, 20] as [number, number],
         start: p34,
         end: junction34,
         activeA: is34Active,
@@ -397,13 +415,24 @@ function SplineAtriumBodyGraph({
 
     const p10 = gatePositions[10];
     if (p10) {
-      const junction10 = projectPointToSegment(p10, p57, p20);
+      // 10 閘門管子朝 9 點鐘方向（-X 水平，保持 z = p10.z）延伸並連接至 57-20 主幹線
+      const dz = p20.z - p57.z;
+      const t10 =
+        Math.abs(dz) > 1e-5
+          ? Math.max(0.06, Math.min(0.94, (p10.z - p57.z) / dz))
+          : 0.5;
+      const junction10 = new THREE.Vector3(
+        p57.x + t10 * (p20.x - p57.x),
+        p10.y,
+        p10.z
+      );
       const is10Active = activeGates.includes(10);
       const junctionLit = is10Active && (anyMainActive || activeGates.includes(34));
       branches.push({
         id: '10-junction',
-        name: '10 匯流至 57-20 主幹線（覺醒／完美形式／探索）',
-        gates: [10, 57],
+        name: '10 匯流（覺醒／審美眼光／自我砥礪）',
+        description: '由 10 閘門朝 9 點鐘方向水平延伸連接 57-20 主幹線，串聯 10-20、57-10 與 34-10',
+        gates: [10, 57] as [number, number],
         start: p10,
         end: junction10,
         activeA: is10Active,
@@ -421,6 +450,8 @@ function SplineAtriumBodyGraph({
   ];
 
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
+    // 進入人體圖內部空間後，不再點擊觸發物件預覽視角
+    if (isInInterior) return;
     const target = e.object;
     const gateNum = target.userData.gateNumber as number | undefined;
     if (gateNum !== undefined) {
@@ -456,31 +487,33 @@ function SplineAtriumBodyGraph({
         object={modelRoot}
         onClick={handleClick}
         onPointerOver={(e: ThreeEvent<PointerEvent>) => {
+          if (isInInterior) return;
           if (e.object.userData.centerId || e.object.userData.gateNumber) {
             e.stopPropagation();
             document.body.style.cursor = 'pointer';
           }
         }}
         onPointerOut={() => {
+          if (isInInterior) return;
           document.body.style.cursor = 'auto';
         }}
       />
 
-      {/* 當攝影機位於九中心內部時，在中心內點亮柔光以看清立體幾何內室空間 */}
-      {activeInteriorCenterPos && (
+      {/* 當攝影機位於人體圖內部空間時，提供柔光照明看清九中心與通道連通內室 */}
+      {isInInterior && (
         <pointLight
-          position={[
-            activeInteriorCenterPos.x,
-            activeInteriorCenterPos.y + 0.2,
-            activeInteriorCenterPos.z,
-          ]}
+          position={
+            activeInteriorCenterPos
+              ? [activeInteriorCenterPos.x, activeInteriorCenterPos.y + 0.6, activeInteriorCenterPos.z]
+              : [0, 1.5, 0]
+          }
           intensity={config.centerInteriorLight}
-          distance={8}
+          distance={26}
           color="#fef3c7"
         />
       )}
 
-      {/* 一般通道中空管線（點擊可選中並進入管線內部） */}
+      {/* 一般通道中空管線（與九中心連通，點擊可選中並進入人體圖內部空間） */}
       {standardChannels.map((ch) => {
         const s = gatePositions[ch.gates[0]];
         const e = gatePositions[ch.gates[1]];
@@ -495,15 +528,22 @@ function SplineAtriumBodyGraph({
             activeA={activeGates.includes(ch.gates[0])}
             activeB={activeGates.includes(ch.gates[1])}
             isLight={isLight}
-            isInsideThis={interiorChannelId === ch.id}
+            isInInterior={isInInterior}
             onSelectChannel={() =>
-              onSelectChannel(ch.id, ch.name, ch.gates, toWorldTuple(s), toWorldTuple(e))
+              onSelectChannel(
+                ch.id,
+                ch.name,
+                ch.description,
+                ch.gates,
+                toWorldTuple(s),
+                toWorldTuple(e)
+              )
             }
           />
         );
       })}
 
-      {/* 整合迴路特殊接線：34、10 連接至 57-20 主幹線的匯流節點 */}
+      {/* 整合迴路特殊接線：34 與 10（朝 9 點鐘水平延伸）連接至 57-20 主幹線 */}
       {integrationBranches.map((br) => (
         <group key={br.id}>
           <ChannelConduit
@@ -515,12 +555,21 @@ function SplineAtriumBodyGraph({
             activeA={br.activeA}
             activeB={br.activeB}
             isLight={isLight}
-            isInsideThis={interiorChannelId === br.id}
+            isInInterior={isInInterior}
+            extendStart={0.35}
+            extendEnd={0}
             onSelectChannel={() =>
-              onSelectChannel(br.id, br.name, br.gates, toWorldTuple(br.start), toWorldTuple(br.end))
+              onSelectChannel(
+                br.id,
+                br.name,
+                br.description,
+                br.gates,
+                toWorldTuple(br.start),
+                toWorldTuple(br.end)
+              )
             }
           />
-          {/* 匯流點接頭環 */}
+          {/* 匯流點中空接頭環 */}
           <mesh position={br.end}>
             <sphereGeometry args={[config.junctionSphereRadius, 14, 14]} />
             <meshStandardMaterial
@@ -528,6 +577,8 @@ function SplineAtriumBodyGraph({
               emissive={br.activeA ? '#f59e0b' : '#0f172a'}
               emissiveIntensity={br.activeA ? 0.65 : 0.1}
               side={THREE.DoubleSide}
+              transparent={isInInterior}
+              opacity={isInInterior ? config.centerInteriorOpacity : 1}
             />
           </mesh>
         </group>
@@ -701,15 +752,15 @@ export function BodyGraph3D() {
             activeGates={chart.activeGates}
             isLight={isLight}
             yOffset={config.bodyGraphFlatY}
+            isInInterior={interiorSpace !== null}
             interiorCenterId={interiorSpace?.type === 'center' ? interiorSpace.centerId : null}
-            interiorChannelId={interiorSpace?.type === 'channel' ? interiorSpace.channelId : null}
             onSelectCenter={(c, worldPos) => selectCenter(c.id, worldPos)}
             onSelectGate={(gateNum, worldPos) => {
               const info = GATE_BY_NUMBER[gateNum];
               if (info) selectGate(info, worldPos);
             }}
-            onSelectChannel={(id, name, gates, start, end) =>
-              selectChannel(id, name, gates, start, end)
+            onSelectChannel={(id, name, description, gates, start, end) =>
+              selectChannel(id, name, description, gates, start, end)
             }
           />
         </Suspense>

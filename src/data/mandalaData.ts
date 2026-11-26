@@ -287,54 +287,55 @@ export interface ChannelInfo {
   gates: [number, number];
   centers: [CenterId, CenterId];
   name: string;
+  description: string;
 }
 
 export const CHANNELS: ChannelInfo[] = [
   // Head ↔ Ajna
-  { id: '64-47', gates: [64, 47], centers: ['head', 'ajna'], name: '抽象通道' },
-  { id: '61-24', gates: [61, 24], centers: ['head', 'ajna'], name: '覺察通道' },
-  { id: '63-4', gates: [63, 4], centers: ['head', 'ajna'], name: '邏輯通道' },
+  { id: '64-47', gates: [64, 47], centers: ['head', 'ajna'], name: '提煉', description: '我擅長從過去的記憶和體驗中提煉出新的意義，為過去賦予新的可能性' },
+  { id: '61-24', gates: [61, 24], centers: ['head', 'ajna'], name: '啟發', description: '我有能力藉由思考來探索生命的奧秘、並為人們帶來啟發' },
+  { id: '63-4', gates: [63, 4], centers: ['head', 'ajna'], name: '研究精神', description: '我能藉由提出問題並尋找答案，以更接近事實真相' },
   // Ajna ↔ Throat
-  { id: '17-62', gates: [17, 62], centers: ['ajna', 'throat'], name: '組織通道' },
-  { id: '43-23', gates: [43, 23], centers: ['ajna', 'throat'], name: '架構通道' },
-  { id: '11-56', gates: [11, 56], centers: ['ajna', 'throat'], name: '好奇通道' },
+  { id: '17-62', gates: [17, 62], centers: ['ajna', 'throat'], name: '企劃', description: '我能有條理地組織並建構新計畫' },
+  { id: '43-23', gates: [43, 23], centers: ['ajna', 'throat'], name: '重塑', description: '我能藉由翻轉思維帶來全新觀點，使世人看見新的可能' },
+  { id: '11-56', gates: [11, 56], centers: ['ajna', 'throat'], name: '說書', description: '我能帶著好奇心去探索世界，並分享我的所見所聞' },
   // Throat ↔ G
-  { id: '31-7', gates: [31, 7], centers: ['throat', 'g'], name: '創始者通道' },
-  { id: '8-1', gates: [8, 1], centers: ['throat', 'g'], name: '靈感通道' },
-  { id: '33-13', gates: [33, 13], centers: ['throat', 'g'], name: '浪子通道' },
+  { id: '31-7', gates: [31, 7], centers: ['throat', 'g'], name: '領導', description: '我能在適當時機站出來、指引眾人方向' },
+  { id: '8-1', gates: [8, 1], centers: ['throat', 'g'], name: '展現自我', description: '我能勇於對外展現自己獨到的創意' },
+  { id: '33-13', gates: [33, 13], centers: ['throat', 'g'], name: '不貳過', description: '我能蒐集，並妥善運用所有經驗、不重蹈覆轍' },
   // Throat ↔ Ego / Spleen / Sacral / Solar
-  { id: '45-21', gates: [45, 21], centers: ['throat', 'ego'], name: '金錢線通道' },
-  { id: '16-48', gates: [16, 48], centers: ['throat', 'spleen'], name: '才華通道' },
-  { id: '20-57', gates: [20, 57], centers: ['throat', 'spleen'], name: '腦波通道' },
-  { id: '20-34', gates: [20, 34], centers: ['throat', 'sacral'], name: '魅力通道' },
-  { id: '20-10', gates: [20, 10], centers: ['throat', 'g'], name: '覺醒通道' },
-  { id: '35-36', gates: [35, 36], centers: ['throat', 'solar'], name: '無常通道' },
-  { id: '12-22', gates: [12, 22], centers: ['throat', 'solar'], name: '開放通道' },
+  { id: '45-21', gates: [45, 21], centers: ['throat', 'ego'], name: '管理', description: '物盡其用、妥善地利用每一項資源就是我的強項' },
+  { id: '16-48', gates: [16, 48], centers: ['throat', 'spleen'], name: '專精', description: '我能專精於我喜愛的技能並觸類旁通' },
+  { id: '20-57', gates: [20, 57], centers: ['throat', 'spleen'], name: '第六感', description: '我能敏銳察覺風險、防患於未然' },
+  { id: '20-34', gates: [20, 34], centers: ['throat', 'sacral'], name: '即知即行', description: '活在當下、說走就走，乾淨俐落地做事就是我的超能力' },
+  { id: '20-10', gates: [20, 10], centers: ['throat', 'g'], name: '覺醒', description: '我能在每個當下真實地展現自我，並不斷進化' },
+  { id: '35-36', gates: [35, 36], centers: ['throat', 'solar'], name: '體驗', description: '凡殺不死我的，都使我更強大。所有體驗都是我的養分，讓我成為萬事通' },
+  { id: '12-22', gates: [12, 22], centers: ['throat', 'solar'], name: '渲染', description: '我能適度展現自己的情緒，並以此影響他人' },
   // G ↔ Ego / Spleen / Sacral
-  { id: '25-51', gates: [25, 51], centers: ['g', 'ego'], name: '發起通道' },
-  { id: '10-57', gates: [10, 57], centers: ['g', 'spleen'], name: '完美形式通道' },
-  { id: '10-34', gates: [10, 34], centers: ['g', 'sacral'], name: '探索通道' },
-  { id: '15-5', gates: [15, 5], centers: ['g', 'sacral'], name: '韻律通道' },
-  { id: '2-14', gates: [2, 14], centers: ['g', 'sacral'], name: '脈動通道' },
-  { id: '46-29', gates: [46, 29], centers: ['g', 'sacral'], name: '發現通道' },
+  { id: '25-51', gates: [25, 51], centers: ['g', 'ego'], name: '先鋒', description: '我勇於走在最前面、不被動地等待機會，而是由我自己創造' },
+  { id: '10-57', gates: [10, 57], centers: ['g', 'spleen'], name: '審美眼光', description: '我能看見萬事萬物美好的一面，並發揚光大' },
+  { id: '10-34', gates: [10, 34], centers: ['g', 'sacral'], name: '自我砥礪', description: '我能全然接納自己的好與壞，並激勵自己不斷進步、活出真實的自己' },
+  { id: '15-5', gates: [15, 5], centers: ['g', 'sacral'], name: '韻律', description: '我能活在生命之流中，並吸引旁人效仿' },
+  { id: '2-14', gates: [2, 14], centers: ['g', 'sacral'], name: '脈動', description: '我能妥善地運用自己的能量，以達成目的' },
+  { id: '46-29', gates: [46, 29], centers: ['g', 'sacral'], name: '全心全意', description: '一旦承諾我就會全心投入，去發現所有的可能性' },
   // Ego ↔ Spleen / Solar
-  { id: '26-44', gates: [26, 44], centers: ['ego', 'spleen'], name: '投降通道' },
-  { id: '40-37', gates: [40, 37], centers: ['ego', 'solar'], name: '社群通道' },
+  { id: '26-44', gates: [26, 44], centers: ['ego', 'spleen'], name: '行銷高手', description: '我能嗅出商機，並以最省力的方式創造和傳遞價值' },
+  { id: '40-37', gates: [40, 37], centers: ['ego', 'solar'], name: '凝聚', description: '我將有共同理念的人凝聚起來，藉由合作來開創新局勢' },
   // Spleen ↔ Sacral / Root
-  { id: '57-34', gates: [57, 34], centers: ['spleen', 'sacral'], name: '力量通道' },
-  { id: '50-27', gates: [50, 27], centers: ['spleen', 'sacral'], name: '保存通道' },
-  { id: '32-54', gates: [32, 54], centers: ['spleen', 'root'], name: '蛻變通道' },
-  { id: '28-38', gates: [28, 38], centers: ['spleen', 'root'], name: '掙扎通道' },
-  { id: '18-58', gates: [18, 58], centers: ['spleen', 'root'], name: '批判通道' },
+  { id: '57-34', gates: [57, 34], centers: ['spleen', 'sacral'], name: '自給自足', description: '我只要信任我的直覺，就能過得很好。他人的眼色從來都不重要' },
+  { id: '50-27', gates: [50, 27], centers: ['spleen', 'sacral'], name: '照料', description: '我將族群內的大大小小事情都打點好，是能受眾人信任的對象' },
+  { id: '32-54', gates: [32, 54], centers: ['spleen', 'root'], name: '成就', description: '我能透過持續不懈的努力來達成目標，使自己和族群能過得更好' },
+  { id: '28-38', gates: [28, 38], centers: ['spleen', 'root'], name: '堅持不懈', description: '我為自己的生命奮戰、走出屬於自己的道路' },
+  { id: '18-58', gates: [18, 58], centers: ['spleen', 'root'], name: '優化', description: '我能發覺各種事物的進步空間，並著手改善' },
   // Sacral ↔ Solar / Root
-  { id: '59-6', gates: [59, 6], centers: ['sacral', 'solar'], name: '親密通道' },
-  { id: '42-53', gates: [42, 53], centers: ['sacral', 'root'], name: '成熟通道' },
-  { id: '3-60', gates: [3, 60], centers: ['sacral', 'root'], name: '突變通道' },
-  { id: '9-52', gates: [9, 52], centers: ['sacral', 'root'], name: '專注通道' },
+  { id: '59-6', gates: [59, 6], centers: ['sacral', 'solar'], name: '創造', description: '我能選擇並創造精彩可期的人脈關係' },
+  { id: '42-53', gates: [42, 53], centers: ['sacral', 'root'], name: '有始有終', description: '我能謹慎決定要將能量投入哪些事情中，透過每一次體驗的循環不斷成長' },
+  { id: '3-60', gates: [3, 60], centers: ['sacral', 'root'], name: '革新', description: '我能承先啟後、透過突變來不斷進化' },
+  { id: '9-52', gates: [9, 52], centers: ['sacral', 'root'], name: '專注', description: '我能沉穩並專注地處理細節工作' },
   // Solar ↔ Root
-  { id: '49-19', gates: [49, 19], centers: ['solar', 'root'], name: '整合通道' },
-  { id: '55-39', gates: [55, 39], centers: ['solar', 'root'], name: '情緒通道' },
-  { id: '30-41', gates: [30, 41], centers: ['solar', 'root'], name: '夢想家通道' },
+  { id: '49-19', gates: [49, 19], centers: ['solar', 'root'], name: '調節', description: '我善於察覺需求，並調配資源以滿足需求' },
+  { id: '55-39', gates: [55, 39], centers: ['solar', 'root'], name: '刺激', description: '充沛的情緒是我的創造力來源，也刺激我和眾人更認識自己的全貌' },
+  { id: '30-41', gates: [30, 41], centers: ['solar', 'root'], name: '遠見', description: '我對未來總是懷抱著期待，並看見新的可能' },
 ];
 
 export const CENTER_LINKS: Array<[CenterId, CenterId]> = [

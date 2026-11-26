@@ -39,6 +39,7 @@ export type SelectedEntity =
       type: 'channel';
       channelId: string;
       name: string;
+      description?: string;
       gates: [number, number];
       start: [number, number, number];
       end: [number, number, number];
@@ -99,6 +100,7 @@ interface WorldState {
   selectChannel: (
     channelId: string,
     name: string,
+    description: string,
     gates: [number, number],
     start: [number, number, number],
     end: [number, number, number]
@@ -331,9 +333,9 @@ export const useWorldStore = create<WorldState>((set, get) => ({
       cameraFocusTarget: focusPos ?? null,
     }),
 
-  selectChannel: (channelId, name, gates, start, end) =>
+  selectChannel: (channelId, name, description, gates, start, end) =>
     set({
-      selected: { type: 'channel', channelId, name, gates, start, end },
+      selected: { type: 'channel', channelId, name, description, gates, start, end },
       cameraFocusTarget: [
         (start[0] + end[0]) / 2,
         (start[1] + end[1]) / 2,
@@ -345,7 +347,8 @@ export const useWorldStore = create<WorldState>((set, get) => ({
     set({
       stage: 'bodygraph',
       interiorSpace: { type: 'center', centerId, position },
-      selected: { type: 'center', centerId, worldPos: position },
+      // 進入人體圖內部空間後不顯示預覽檢視卡
+      selected: null,
       cameraFocusTarget: null,
     }),
 
@@ -353,6 +356,8 @@ export const useWorldStore = create<WorldState>((set, get) => ({
     set({
       stage: 'bodygraph',
       interiorSpace: { type: 'channel', channelId, name, start, end, progress: 0.15 },
+      // 進入人體圖內部空間後不顯示預覽檢視卡
+      selected: null,
       cameraFocusTarget: null,
     }),
 

@@ -50,7 +50,6 @@ export function HudOverlay() {
   const enterCorridorByGate = useWorldStore((s) => s.enterCorridorByGate);
   const enterCenterInterior = useWorldStore((s) => s.enterCenterInterior);
   const enterChannelInterior = useWorldStore((s) => s.enterChannelInterior);
-  const setChannelInteriorProgress = useWorldStore((s) => s.setChannelInteriorProgress);
   const exitInteriorSpace = useWorldStore((s) => s.exitInteriorSpace);
   const switchAdjacentCorridor = useWorldStore((s) => s.switchAdjacentCorridor);
   const setCorridorRadius = useWorldStore((s) => s.setCorridorRadius);
@@ -318,46 +317,22 @@ export function HudOverlay() {
         </section>
       )}
 
-      {/* 室內漫遊控制條（位於九中心或通道管線內部時顯示） */}
+      {/* 人體圖內部自由漫遊提示條（九中心與通道連通空間） */}
       {interiorSpace && (
         <section className="guide-panel">
           <span className="guide-badge guide-badge--cyan">
+            人體圖內部自由漫遊｜
             {interiorSpace.type === 'center'
-              ? `中心內部空間｜${CENTERS.find((c) => c.id === interiorSpace.centerId)?.name}`
-              : `通道管線內部｜${interiorSpace.channelId} ${interiorSpace.name}`}
+              ? `起點：${CENTERS.find((c) => c.id === interiorSpace.centerId)?.name}`
+              : `起點：${interiorSpace.channelId} ${interiorSpace.name}`}
           </span>
-          {interiorSpace.type === 'center' ? (
-            <p style={{ marginTop: 6 }}>
-              滑鼠拖曳可 360° 環視中心內壁，<code>W A S D / Q E</code> 可在中心內自由移動。按{' '}
-              <code>Esc</code> 退出。
-            </p>
-          ) : (
-            <>
-              <p style={{ marginTop: 6 }}>
-                <code>W / S</code> 或滑鼠滾輪沿著通道管線內部穿梭（進度{' '}
-                {Math.round(interiorSpace.progress * 100)}%）。按 <code>Esc</code> 退出。
-              </p>
-              <div className="corridor-pad" style={{ marginTop: 8 }}>
-                <button
-                  type="button"
-                  className="btn-ghost"
-                  onClick={() => setChannelInteriorProgress(interiorSpace.progress - 0.12)}
-                >
-                  ↓ 後退
-                </button>
-                <button
-                  type="button"
-                  className="btn-ghost"
-                  onClick={() => setChannelInteriorProgress(interiorSpace.progress + 0.12)}
-                >
-                  ↑ 前進
-                </button>
-              </div>
-            </>
-          )}
+          <p style={{ marginTop: 6 }}>
+            滑鼠拖曳 360° 轉頭，<code>W A S D</code> 直接從九中心走進相連通道（反之亦然），
+            <code>Q / E</code> 升降，按 <code>Esc</code> 退出。
+          </p>
           <div className="guide-actions" style={{ marginTop: 10 }}>
             <button type="button" className="btn-primary" onClick={exitInteriorSpace}>
-              退出內部空間 (Esc)
+              退出人體圖內部空間 (Esc)
             </button>
           </div>
         </section>
@@ -493,8 +468,8 @@ export function HudOverlay() {
         />
       )}
 
-      {/* 閘門／中心檢視卡（避免與跑圖抽屜重疊，開啟抽屜時可由使用者關閉抽屜或同時並存） */}
-      {selected && !showChartDrawer && (
+      {/* 閘門／中心檢視卡（進入人體圖內部空間後不顯示預覽卡） */}
+      {selected && !showChartDrawer && !interiorSpace && (
         <aside className="inspector-card">
           <button type="button" className="inspector-close" onClick={clearSelection}>
             ✕
@@ -570,9 +545,12 @@ export function HudOverlay() {
           {selected.type === 'channel' && (
             <>
               <span className="guide-badge guide-badge--gold">
-                通道管線 · {selected.channelId}
+                通道 · {selected.channelId}
               </span>
               <h3>{selected.name}</h3>
+              {selected.description && (
+                <p className="inspector-lead">{selected.description}</p>
+              )}
               <div className="inspector-meta" style={{ marginBottom: 10 }}>
                 連接閘門：Gate {selected.gates[0]} ↔ Gate {selected.gates[1]}
               </div>
@@ -589,7 +567,7 @@ export function HudOverlay() {
                   )
                 }
               >
-                🌀 進入通道管線內部穿梭 →
+                🌀 從此通道進入人體圖內部空間 →
               </button>
             </>
           )}

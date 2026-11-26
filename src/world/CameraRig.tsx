@@ -72,11 +72,6 @@ export function CameraRig() {
     };
     const onWheel = (e: WheelEvent) => {
       const state = useWorldStore.getState();
-      if (state.interiorSpace?.type === 'channel') {
-        const step = e.deltaY < 0 ? 0.045 : -0.045;
-        state.setChannelInteriorProgress(state.interiorSpace.progress + step);
-        return;
-      }
       if (state.stage === 'corridor' || state.stage === 'black-sun') {
         // 滾輪往前推（deltaY < 0）沿目前視角方向前進
         const forwardSign = state.corridorDirection === 'in' ? -1 : 1;
@@ -153,54 +148,39 @@ export function CameraRig() {
     const controls = controlsRef.current;
     if (!controls) return;
 
-    // 1. 進入「通道管線內部空間」：沿管線軸心前後穿梭
-    if (interiorSpace?.type === 'channel') {
-      enteredCenterIdRef.current = null;
-      const keys = keysPressed.current;
-      let nextP = interiorSpace.progress;
-      const travelSpeed = 0.28 * delta;
-      if (keys['KeyW'] || keys['ArrowUp']) nextP += travelSpeed;
-      if (keys['KeyS'] || keys['ArrowDown']) nextP -= travelSpeed;
-      if (nextP !== interiorSpace.progress) {
-        useWorldStore.getState().setChannelInteriorProgress(nextP);
-      }
+    // 1. 統一「人體圖內部自由步行空間」：不論從九中心或通道進入，先平滑飛至起點，接著解鎖為 360° 環視 + WASD/QE 自由穿梭（可從中心直接走進通道、反之亦然）
+    if (interiorSpace) {
+      const entryKey =
+        interiorSpace.type === 'center'
+          ? `center:${interiorSpace.centerId}`
+          : `channel:${interiorSpace.channelId}`;
 
-      channelStartVec.set(...interiorSpace.start);
-      channelEndVec.set(...interiorSpace.end);
-      corridorCamPos.lerpVectors(channelStartVec, channelEndVec, interiorSpace.progress);
-      corridorLookPos.lerpVectors(
-        channelStartVec,
-        channelEndVec,
-        Math.min(1, interiorSpace.progress + 0.16)
-      );
-
-      const lerpAlpha = 1 - Math.exp(-delta * 7.5);
-      camera.position.lerp(corridorCamPos, lerpAlpha);
-      controls.target.lerp(corridorLookPos, lerpAlpha);
-      controls.update();
-      return;
-    }
-
-    // 2. 進入「九中心內部空間」：飛進中心正中央，可 360° 環視 + WASD/QE 在室內自由漫遊
-    if (interiorSpace?.type === 'center') {
-      const centerKey = interiorSpace.centerId;
-      if (enteredCenterIdRef.current !== centerKey) {
-        const cPos = new THREE.Vector3(...interiorSpace.position);
-        const initCam = cPos.clone().add(new THREE.Vector3(0, 0.08, 0.22));
-        const initTarget = cPos.clone().add(new THREE.Vector3(0, 0.08, -0.35));
-        const lerpAlpha = 1 - Math.exp(-delta * 5.5);
+      if (enteredCenterIdRef.current !== entryKey) {
+        let initCam: THREE.Vector3;
+        let initTarget: THREE.Vector3;
+        if (interiorSpace.type === 'center') {
+          const cPos = new THREE.Vector3(...interiorSpace.position);
+          initCam = cPos.clone().add(new THREE.Vector3(0, 0.08, 0.22));
+          initTarget = cPos.clone().add(new THREE.Vector3(0, 0.08, -0.35));
+        } else {
+          channelStartVec.set(...interiorSpace.start);
+          channelEndVec.set(...interiorSpace.end);
+          initCam = corridorCamPos.lerpVectors(channelStartVec, channelEndVec, 0.12).clone();
+          initTarget = corridorLookPos.lerpVectors(channelStartVec, channelEndVec, 0.35).clone();
+        }
+        const lerpAlpha = 1 - Math.exp(-delta * 6.0);
         camera.position.lerp(initCam, lerpAlpha);
         controls.target.lerp(initTarget, lerpAlpha);
-        if (camera.position.distanceTo(initCam) < 0.06) {
-          enteredCenterIdRef.current = centerKey;
+        if (camera.position.distanceTo(initCam) < 0.08) {
+          enteredCenterIdRef.current = entryKey;
         }
         controls.update();
         return;
       }
 
-      // 進入室內後開放精細 WASD/QE 漫遊（速度調慢方便在中心內穿梭）
+      // 已進入人體圖內部空間：統一自由漫遊，可任意在九中心與 36 通道間雙向行走
       const keys = keysPressed.current;
-      const speed = (keys['ShiftLeft'] || keys['ShiftRight'] ? 6 : 2.8) * delta;
+      const speed = (keys['ShiftLeft'] || keys['ShiftRight'] ? 6.5 : 3.0) * delta;
       moveDelta.set(0, 0, 0);
       camera.getWorldDirection(forward);
       forward.normalize();
@@ -311,21 +291,20 @@ export function CameraRig() {
   });
 
   const inCorridor = stage === 'corridor' || stage === 'black-sun';
-  const inChannelInterior = interiorSpace?.type === 'channel';
-  const inCenterInterior = interiorSpace?.type === 'center';
+  const inInterior = interiorSpace !== null;
 
   return (
     <OrbitControls
       ref={controlsRef}
       enableDamping
       dampingFactor={0.07}
-      enableRotate={!inCorridor && !inChannelInterior}
-      enablePan={stage === 'free-roam' || inCenterInterior}
+      enableRotate={!inCorridor}
+      enablePan={stage === 'free-roam' || inInterior}
       enableZoom={
         stage === 'free-roam' ||
         stage === 'bodygraph' ||
         stage === 'intro' ||
-        inCenterInterior
+        inInterior
       }
       minDistance={0.15}
       maxDistance={290}
