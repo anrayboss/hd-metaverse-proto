@@ -75,7 +75,8 @@ export function ChartResultPanel({
       const now = performance.now();
       if (now - lastWheelAt < 140) return;
       lastWheelAt = now;
-      stepVariableDetailLevel(e.deltaY > 0 ? 1 : -1);
+      // 向上滾增加數值顯示、向下滾減少
+      stepVariableDetailLevel(e.deltaY < 0 ? 1 : -1);
     };
     el.addEventListener('wheel', handleWheel, { passive: false });
     return () => el.removeEventListener('wheel', handleWheel);
@@ -395,16 +396,16 @@ export function ChartResultPanel({
                     className={`hd-var-chip hd-var-chip--${v.side} ${visible ? '' : 'hd-var-chip--hidden'}`}
                     title={`${v.label}｜C${v.color} T${v.tone} B${v.base}`}
                   >
-                    <span className="hd-var-arrow">{v.isLeft ? '◀' : '▶'}</span>
-                    <span className="hd-var-label">{v.label}</span>
+                    <div className="hd-var-top">
+                      <span className="hd-var-arrow">{v.isLeft ? '◀' : '▶'}</span>
+                      <span className="hd-var-label">{v.label}</span>
+                    </div>
                     {variableDetailLevel >= 1 && (
-                      <span className="hd-var-ctb">
-                        <span className="hd-var-c">C{v.color}</span>
-                        <span className="hd-var-tb-stack">
-                          <span>T{v.tone}</span>
-                          {variableDetailLevel >= 2 && <span className="hd-var-base">B{v.base}</span>}
-                        </span>
-                      </span>
+                      <div className="hd-var-ctb">
+                        {variableDetailLevel >= 2
+                          ? `C${v.color} T${v.tone} B${v.base}`
+                          : `C${v.color} T${v.tone}`}
+                      </div>
                     )}
                   </div>
                 );

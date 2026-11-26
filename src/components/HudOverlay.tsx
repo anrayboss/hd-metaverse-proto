@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { CENTERS, MANDALA_GATES, QUADRANT_META, RING_RADII } from '../data/mandalaData';
 import { CITY_OPTIONS, DEFAULT_CITY } from '../data/cities';
-import { DisplayMode, ENABLE_SUN_GUIDE, JourneyStage, useWorldStore } from '../store/useWorldStore';
+import { ENABLE_SUN_GUIDE, JourneyStage, useWorldStore } from '../store/useWorldStore';
 import { ChartResultPanel } from './ChartResultPanel';
 import { InfoModal, InfoModalRequest } from './InfoModal';
 
@@ -129,27 +129,6 @@ export function HudOverlay() {
             <div className="hud-brand__title">人類設計宇宙｜1/64 閘門走廊</div>
             <div className="hud-brand__sub">鳥瞰曼陀羅 · 瑞士星曆表 30 星體跑圖</div>
           </div>
-        </div>
-
-        <div className="display-mode-switch" role="tablist" aria-label="圖表檢視模式">
-          {(
-            [
-              { id: 'bodygraph-2d', label: '2D 本命圖' },
-              { id: 'mandala-2d', label: '2D 基礎曼陀羅' },
-              { id: 'universe-3d', label: '3D 元宇宙' },
-            ] as Array<{ id: DisplayMode; label: string }>
-          ).map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              role="tab"
-              aria-selected={displayMode === m.id}
-              className={`stage-pill ${displayMode === m.id ? 'stage-pill--active' : ''}`}
-              onClick={() => setDisplayMode(m.id)}
-            >
-              {m.label}
-            </button>
-          ))}
         </div>
 
         {displayMode === 'universe-3d' && (

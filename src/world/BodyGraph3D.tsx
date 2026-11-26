@@ -1,7 +1,8 @@
 import { Suspense, useEffect, useMemo, useRef } from 'react';
 import { ThreeEvent, useFrame } from '@react-three/fiber';
-import { Line, Text, useGLTF } from '@react-three/drei';
+import { Line, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
+import { SVGLoader } from 'three/examples/jsm/loaders/SVGLoader.js';
 import {
   CENTERS,
   CENTER_LINKS,
@@ -218,10 +219,68 @@ function ChannelConduit({
   );
 }
 
+/** 與 public/assets/body-graph.svg (#arrow-tr-right) 完全一致的 2D 書法風格右箭頭貝茲路徑 */
+const BODYGRAPH_2D_ARROW_RIGHT_PATH =
+  'M164.744,39.62c-0.471,0.183-0.9,0.38-1.29,0.589s-0.744,0.443-1.063,0.705' +
+  'c-0.317,0.261-0.607,0.554-0.865,0.878c-0.26,0.324-0.496,0.693-0.71,1.105c-0.105,0.199-0.238,0.329-0.4,0.388' +
+  'c-0.163,0.061-0.319,0.09-0.471,0.09c-0.127,0-0.246-0.024-0.363-0.074c-0.119-0.05-0.225-0.117-0.318-0.201' +
+  'c-0.095-0.083-0.171-0.181-0.229-0.294c-0.057-0.112-0.085-0.23-0.085-0.356c0-0.163,0.03-0.306,0.091-0.431' +
+  'c0.061-0.127,0.152-0.257,0.277-0.392c0.396-0.398,0.922-0.742,1.576-1.031c0.654-0.29,1.472-0.55,2.454-0.78h-1.41' +
+  'c-1.256,0-2.368,0.043-3.34,0.129c-0.973,0.086-1.84,0.182-2.6,0.286c-0.762,0.105-1.431,0.201-2.008,0.287' +
+  'c-0.579,0.086-1.097,0.129-1.557,0.129c-0.355,0-0.632-0.093-0.833-0.279c-0.196-0.185-0.296-0.44-0.296-0.764' +
+  'c0-0.325,0.1-0.58,0.296-0.764c0.201-0.186,0.478-0.279,0.833-0.279c0.46,0,0.978,0.043,1.557,0.129' +
+  'c0.577,0.086,1.246,0.183,2.008,0.29c0.76,0.108,1.627,0.205,2.6,0.291c0.972,0.086,2.084,0.129,3.34,0.129h1.41' +
+  'c-0.982-0.236-1.8-0.497-2.454-0.784s-1.18-0.632-1.576-1.035c-0.125-0.136-0.217-0.266-0.277-0.388s-0.091-0.266-0.091-0.427' +
+  'c0-0.131,0.028-0.252,0.085-0.365c0.059-0.112,0.135-0.21,0.229-0.294c0.094-0.083,0.199-0.149,0.318-0.2' +
+  'c0.117-0.05,0.236-0.074,0.363-0.074c0.151,0,0.308,0.031,0.471,0.093c0.162,0.063,0.295,0.191,0.4,0.385' +
+  'c0.214,0.413,0.45,0.781,0.71,1.105c0.258,0.324,0.548,0.616,0.865,0.879c0.318,0.26,0.673,0.496,1.063,0.705' +
+  'c0.39,0.209,0.819,0.406,1.29,0.588V39.62z';
+
+/** 以與 2D body-graph.svg 相同的 Times New Roman 字形繪製高解析水平置中 CTB 標籤 */
+function VariableLabel3D({
+  text,
+  color,
+  position,
+}: {
+  text: string;
+  color: string;
+  position: [number, number, number];
+}) {
+  const texture = useMemo(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = color;
+      ctx.font = '500 74px "Times New Roman", "TimesNewRomanPSMT", Georgia, serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, canvas.width / 2, canvas.height / 2 + 4);
+    }
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    tex.needsUpdate = true;
+    return tex;
+  }, [text, color]);
+
+  useEffect(() => () => texture.dispose(), [texture]);
+
+  return (
+    <mesh position={position} rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[4.4, 1.1]} />
+      <meshBasicMaterial map={texture} transparent depthWrite={false} toneMapped={false} />
+    </mesh>
+  );
+}
+
 /**
- * 3D 人體圖四箭頭（Variables）：對齊 2D 本命圖位置（頭頂與邏輯中心兩側），
- * 依 variableDetailLevel 即時切換 純箭頭 ↔ CT ↔ CTB（Base 置於 Tone 下方），
- * 並同步 viewMode 與南北交點開關（隱藏南北交點時連動隱藏環境 bl 與視角 br）。
+ * 3D 人體圖四箭頭（Variables）：
+ * - 直接採用 2D body-graph.svg 的書法箭頭貝茲路徑擠出 3D 幾何，並以同款 Times New Roman 字形繪製數值
+ * - 佈局對齊 2D：箭頭置中在上，CT / CTB 水平一排置中在箭頭正下方
+ * - 同步連動 variableDetailLevel、viewMode 與南北交點開關
  */
 function VariableArrows3D({
   variables,
@@ -243,29 +302,37 @@ function VariableArrows3D({
   const config = useSceneConfigStore((s) => s.config);
 
   const arrowGeo = useMemo(() => {
-    const shape = new THREE.Shape();
-    // 朝 +X 的俐落箭頭造型（左箭頭以繞 Z 旋轉 180° 翻轉）
-    shape.moveTo(-1.05, 0.22);
-    shape.lineTo(0.2, 0.22);
-    shape.lineTo(0.2, 0.62);
-    shape.lineTo(1.12, 0);
-    shape.lineTo(0.2, -0.62);
-    shape.lineTo(0.2, -0.22);
-    shape.lineTo(-1.05, -0.22);
-    shape.closePath();
-    return new THREE.ExtrudeGeometry(shape, {
+    const svgMarkup = `<svg xmlns="http://www.w3.org/2000/svg"><path d="${BODYGRAPH_2D_ARROW_RIGHT_PATH}"/></svg>`;
+    const parsed = new SVGLoader().parse(svgMarkup);
+    const shapes = parsed.paths.flatMap((p) => SVGLoader.createShapes(p));
+    const geo = new THREE.ExtrudeGeometry(shapes, {
       depth: 0.14,
       bevelEnabled: false,
+      curveSegments: 24,
     });
+    geo.computeBoundingBox();
+    if (geo.boundingBox) {
+      const size = new THREE.Vector3();
+      const center = new THREE.Vector3();
+      geo.boundingBox.getSize(size);
+      geo.boundingBox.getCenter(center);
+      geo.translate(-center.x, -center.y, 0);
+      const targetWidth = 2.75;
+      const s = targetWidth / Math.max(size.x, 0.001);
+      // 翻轉 Y 以對齊 SVG 座標方向並等比縮放（深度維持約 0.14）
+      geo.scale(s, -s, 1);
+    }
+    geo.computeVertexNormals();
+    return geo;
   }, []);
 
   useEffect(() => () => arrowGeo.dispose(), [arrowGeo]);
 
   const topZ = headPos ? headPos.z : -12.6;
   const rawBotZ = ajnaPos ? ajnaPos.z : -8.7;
-  const botZ = Math.abs(rawBotZ - topZ) < 3.6 ? topZ + 3.6 : rawBotZ;
+  const botZ = Math.abs(rawBotZ - topZ) < 3.8 ? topZ + 3.8 : rawBotZ;
   const yArrow = 0.22;
-  const yText = 0.38;
+  const yText = 0.4;
 
   const designColor = config.colorDesign;
   const personalityColor = isLight ? config.colorPersonality : '#e2e8f0';
@@ -283,16 +350,18 @@ function VariableArrows3D({
 
         const isLeftSide = v.position === 'tl' || v.position === 'bl';
         const rowZ = v.position === 'tl' || v.position === 'tr' ? topZ : botZ;
-        // 左側：箭頭在左 (-7.5)、CTB 文字在右 (-5.2)；右側：箭頭在左 (+5.5)、CTB 文字在右 (+7.8)，完全對齊 2D SVG
-        const arrowX = isLeftSide ? -7.5 : 5.5;
-        const textX = isLeftSide ? -5.85 : 7.15;
+        const colX = isLeftSide ? -6.6 : 6.6;
         const color = v.side === 'design' ? designColor : personalityColor;
+        const labelText =
+          variableDetailLevel >= 2
+            ? `C${v.color} T${v.tone} B${v.base}`
+            : `C${v.color} T${v.tone}`;
 
         return (
           <group key={v.position} name={`VariableArrow_${v.position}`}>
             <mesh
               geometry={arrowGeo}
-              position={[arrowX, yArrow, rowZ]}
+              position={[colX, yArrow, rowZ - 0.15]}
               rotation={[-Math.PI / 2, 0, v.isLeft ? Math.PI : 0]}
             >
               <meshStandardMaterial
@@ -301,48 +370,12 @@ function VariableArrows3D({
                 emissiveIntensity={isLight ? 0.15 : 0.45}
                 roughness={0.4}
                 metalness={0.15}
+                side={THREE.DoubleSide}
               />
             </mesh>
 
             {variableDetailLevel >= 1 && (
-              <>
-                <Text
-                  position={[textX, yText, rowZ - 0.68]}
-                  rotation={[-Math.PI / 2, 0, 0]}
-                  fontSize={0.78}
-                  color={color}
-                  anchorX="left"
-                  anchorY="middle"
-                  fontWeight={700}
-                >
-                  {`C${v.color}`}
-                </Text>
-                <Text
-                  position={[textX, yText, rowZ + 0.18]}
-                  rotation={[-Math.PI / 2, 0, 0]}
-                  fontSize={0.78}
-                  color={color}
-                  anchorX="left"
-                  anchorY="middle"
-                  fontWeight={700}
-                >
-                  {`T${v.tone}`}
-                </Text>
-              </>
-            )}
-
-            {variableDetailLevel >= 2 && (
-              <Text
-                position={[textX, yText, rowZ + 1.04]}
-                rotation={[-Math.PI / 2, 0, 0]}
-                fontSize={0.74}
-                color={color}
-                anchorX="left"
-                anchorY="middle"
-                fontWeight={700}
-              >
-                {`B${v.base}`}
-              </Text>
+              <VariableLabel3D text={labelText} color={color} position={[colX, yText, rowZ + 1.15]} />
             )}
           </group>
         );

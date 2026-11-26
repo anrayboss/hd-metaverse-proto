@@ -201,13 +201,12 @@ export function BodyGraph2DSvg({ className = '' }: { className?: string }) {
       }
     });
 
-    // 5. 四箭頭（Variables）＋ Base 數值（置於 Tone 下方）＋ CTB 顯示層級 ＋ 隱藏南北交點時連動隱藏 bl (環境) 與 br (視角)
-    const parseMatrixXY = (el: SVGElement | null): [number, number] | null => {
-      if (!el) return null;
-      const tf = el.getAttribute('transform') || '';
-      const m = tf.match(/matrix\([^)]*\s([-\d.]+)\s+([-\d.]+)\)/);
-      if (!m) return null;
-      return [Number(m[1]), Number(m[2])];
+    // 5. 四箭頭（Variables）：箭頭置中在上，CTB 水平一排置中在箭頭正下方（例：C1 T1 B1）
+    const ARROW_TEXT_ANCHOR: Record<'tl' | 'bl' | 'tr' | 'br', [number, number]> = {
+      tl: [28.92, 51.8],
+      bl: [28.92, 78.6],
+      tr: [158.02, 50.4],
+      br: [158.2, 78.6],
     };
 
     derived.variables.forEach((v) => {
@@ -217,30 +216,13 @@ export function BodyGraph2DSvg({ className = '' }: { className?: string }) {
         (viewMode === 0 && v.side === 'design') ||
         (viewMode === 2 && v.side === 'personality');
       const visible = sideVisible && (!isNodeArrow || planetToggles.nodes);
-      const showCT = visible && variableDetailLevel >= 1;
-      const showBase = visible && variableDetailLevel >= 2;
+      const showValues = visible && variableDetailLevel >= 1;
 
       const arrowLeft = root.querySelector<SVGElement>(`#arrow-${v.position}-left`);
       const arrowRight = root.querySelector<SVGElement>(`#arrow-${v.position}-right`);
       const textColor = root.querySelector<SVGElement>(`#text-${v.position}-color`);
       const textTone = root.querySelector<SVGElement>(`#text-${v.position}-tone`);
-      let textBase = root.querySelector<SVGElement>(`#text-${v.position}-base`);
-
-      if (!textBase && textTone && textTone.parentElement) {
-        const cPos = parseMatrixXY(textColor);
-        const tPos = parseMatrixXY(textTone);
-        const dy = cPos && tPos ? tPos[1] - cPos[1] : 9.4;
-        const bx = tPos ? tPos[0] : 0;
-        const by = tPos ? tPos[1] + dy : 0;
-        const created = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        created.setAttribute('id', `text-${v.position}-base`);
-        created.setAttribute('transform', `matrix(1 0 0 1 ${bx} ${by})`);
-        created.setAttribute('fill', textTone.getAttribute('fill') || '#231815');
-        created.setAttribute('font-family', textTone.getAttribute('font-family') || "'TimesNewRomanPSMT'");
-        created.setAttribute('font-size', textTone.getAttribute('font-size') || '8');
-        textTone.parentElement.insertBefore(created, textTone.nextSibling);
-        textBase = created;
-      }
+      const textBase = root.querySelector<SVGElement>(`#text-${v.position}-base`);
 
       if (arrowLeft) {
         arrowLeft.style.display = v.isLeft ? 'block' : 'none';
@@ -250,20 +232,27 @@ export function BodyGraph2DSvg({ className = '' }: { className?: string }) {
         arrowRight.style.display = v.isLeft ? 'none' : 'block';
         arrowRight.style.visibility = visible ? 'visible' : 'hidden';
       }
-      if (textColor) {
-        textColor.textContent = `C${v.color}`;
-        textColor.style.opacity = showCT ? '1' : '0';
-        textColor.style.visibility = showCT ? 'visible' : 'hidden';
-      }
+
+      // 隱藏舊版右側垂直排列的 tone/base，改由 textColor 單一水平置中於箭頭正下方呈現
       if (textTone) {
-        textTone.textContent = `T${v.tone}`;
-        textTone.style.opacity = showCT ? '1' : '0';
-        textTone.style.visibility = showCT ? 'visible' : 'hidden';
+        textTone.style.opacity = '0';
+        textTone.style.visibility = 'hidden';
       }
       if (textBase) {
-        textBase.textContent = `B${v.base}`;
-        textBase.style.opacity = showBase ? '1' : '0';
-        textBase.style.visibility = showBase ? 'visible' : 'hidden';
+        textBase.style.opacity = '0';
+        textBase.style.visibility = 'hidden';
+      }
+      if (textColor) {
+        const [ax, ay] = ARROW_TEXT_ANCHOR[v.position];
+        textColor.setAttribute('transform', `matrix(1 0 0 1 ${ax} ${ay})`);
+        textColor.setAttribute('text-anchor', 'middle');
+        textColor.setAttribute('font-size', '7.2');
+        textColor.textContent =
+          variableDetailLevel >= 2
+            ? `C${v.color} T${v.tone} B${v.base}`
+            : `C${v.color} T${v.tone}`;
+        textColor.style.opacity = showValues ? '1' : '0';
+        textColor.style.visibility = showValues ? 'visible' : 'hidden';
       }
     });
   }, [
@@ -280,7 +269,7 @@ export function BodyGraph2DSvg({ className = '' }: { className?: string }) {
     config.colorCircleUndefined,
   ]);
 
-  // 在 2D 四箭頭與 CTB 文字上方滾動滑鼠滾輪即可直接切換 純箭頭 ↔ CT ↔ CTB
+  // 在 2D 四箭頭與 CTB 文字上方滾動滑鼠滾輪：向上滾增加數值顯示、向下滾減少
   useEffect(() => {
     const root = containerRef.current;
     if (!root) return;
@@ -301,7 +290,7 @@ export function BodyGraph2DSvg({ className = '' }: { className?: string }) {
       const now = performance.now();
       if (now - lastWheelAt < 140) return;
       lastWheelAt = now;
-      stepVariableDetailLevel(e.deltaY > 0 ? 1 : -1);
+      stepVariableDetailLevel(e.deltaY < 0 ? 1 : -1);
     };
     root.addEventListener('wheel', onWheel, { passive: false });
     return () => root.removeEventListener('wheel', onWheel);

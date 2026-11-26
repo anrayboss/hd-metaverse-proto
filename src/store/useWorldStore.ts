@@ -108,6 +108,7 @@ interface WorldState {
   corridorDirection: CorridorDirection;
   toggleTheme: () => void;
   setDisplayMode: (mode: DisplayMode) => void;
+  stepDisplayMode: (delta: -1 | 1) => void;
   setStage: (stage: JourneyStage) => void;
   nextStage: () => void;
   prevStage: () => void;
@@ -147,6 +148,8 @@ interface WorldState {
   clearSelection: () => void;
   setShowReceiptModal: (open: boolean) => void;
 }
+
+const DISPLAY_MODE_ORDER: DisplayMode[] = ['bodygraph-2d', 'mandala-2d', 'universe-3d'];
 
 const STAGE_ORDER: JourneyStage[] = [
   'intro',
@@ -219,6 +222,15 @@ export const useWorldStore = create<WorldState>((set, get) => ({
       displayMode,
       showChartDrawer: displayMode === 'universe-3d' ? s.showChartDrawer : true,
     })),
+
+  stepDisplayMode: (delta) => {
+    const cur = get().displayMode;
+    const idx = DISPLAY_MODE_ORDER.indexOf(cur);
+    const nextIdx = Math.max(0, Math.min(DISPLAY_MODE_ORDER.length - 1, idx + delta));
+    if (nextIdx !== idx) {
+      get().setDisplayMode(DISPLAY_MODE_ORDER[nextIdx]);
+    }
+  },
 
   setStage: (stage) => {
     const { chart } = get();

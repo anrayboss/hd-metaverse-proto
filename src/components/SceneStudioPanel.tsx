@@ -1,7 +1,94 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { LevaPanel, button, folder, useControls, useCreateStore } from 'leva';
 import { DEFAULT_SCENE_CONFIG, useSceneConfigStore } from '../store/useSceneConfigStore';
-import { useWorldStore } from '../store/useWorldStore';
+import { DisplayMode, useWorldStore } from '../store/useWorldStore';
+
+const DISPLAY_MODES: Array<{ id: DisplayMode; label: string; short: string }> = [
+  { id: 'bodygraph-2d', label: '2D 本命圖', short: '2D 本命圖' },
+  { id: 'mandala-2d', label: '2D 基礎曼陀羅', short: '基礎曼陀羅' },
+  { id: 'universe-3d', label: '3D 元宇宙', short: '3D 元宇宙' },
+];
+
+function DisplayModeDockPanel() {
+  const displayMode = useWorldStore((s) => s.displayMode);
+  const setDisplayMode = useWorldStore((s) => s.setDisplayMode);
+  const stepDisplayMode = useWorldStore((s) => s.stepDisplayMode);
+  const [expanded, setExpanded] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  const activeIdx = Math.max(
+    0,
+    DISPLAY_MODES.findIndex((m) => m.id === displayMode)
+  );
+  const current = DISPLAY_MODES[activeIdx];
+
+  useEffect(() => {
+    const el = panelRef.current;
+    if (!el) return;
+    let lastWheelAt = 0;
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const now = performance.now();
+      if (now - lastWheelAt < 140) return;
+      lastWheelAt = now;
+      // 向上滾進階（2D → 曼陀羅 → 3D），向下滾退回
+      stepDisplayMode(e.deltaY < 0 ? 1 : -1);
+    };
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => el.removeEventListener('wheel', handleWheel);
+  }, [stepDisplayMode]);
+
+  return (
+    <div
+      ref={panelRef}
+      className="dock-mode-panel"
+      title="滑鼠滾輪或展開拖曳切換：2D 本命圖 ↔ 2D 基礎曼陀羅 ↔ 3D 元宇宙"
+    >
+      <button
+        type="button"
+        className="dock-mode-panel__head"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+      >
+        <span className="dock-mode-panel__title">
+          <span>{expanded ? '▼' : '▶'}</span>
+          <span>🧭 檢視模式</span>
+        </span>
+        <span className="dock-mode-panel__badge">{current.short}</span>
+      </button>
+
+      {expanded && (
+        <div className="dock-mode-panel__body">
+          <input
+            type="range"
+            className="hd-var-slider"
+            min={0}
+            max={2}
+            step={1}
+            value={activeIdx}
+            onChange={(e) => {
+              const target = DISPLAY_MODES[Number(e.target.value)];
+              if (target) setDisplayMode(target.id);
+            }}
+            aria-label="切換 2D 本命圖、2D 基礎曼陀羅、3D 元宇宙"
+          />
+          <div className="hd-var-ticks">
+            {DISPLAY_MODES.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                className={`hd-var-tick ${displayMode === m.id ? 'hd-var-tick--active' : ''}`}
+                onClick={() => setDisplayMode(m.id)}
+              >
+                {m.short}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const PALETTE_KEYS = [
   'colorDesign',
@@ -201,6 +288,7 @@ export function SceneStudioPanel() {
   return (
     <>
       <div className="studio-leva-dock">
+        <DisplayModeDockPanel />
         {displayMode === 'universe-3d' && (
           <LevaPanel
             store={studioStore}
