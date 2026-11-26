@@ -328,14 +328,16 @@ function VariableArrows3D({
 
   useEffect(() => () => arrowGeo.dispose(), [arrowGeo]);
 
-  const topZ = headPos ? headPos.z : -12.6;
-  const rawBotZ = ajnaPos ? ajnaPos.z : -8.7;
-  const botZ = Math.abs(rawBotZ - topZ) < 3.8 ? topZ + 3.8 : rawBotZ;
+  const ajnaZ = ajnaPos ? ajnaPos.z : -8.7;
+  const halfRowGap = 2.05;
+  const topZ = ajnaZ - halfRowGap;
+  const botZ = ajnaZ + halfRowGap;
   const yArrow = 0.22;
   const yText = 0.4;
 
-  const designColor = config.colorDesign;
   const personalityColor = isLight ? config.colorPersonality : '#e2e8f0';
+
+  if (variableDetailLevel === 0) return null;
 
   return (
     <group name="VariableArrows3D">
@@ -353,7 +355,7 @@ function VariableArrows3D({
         const colX = isLeftSide ? -6.6 : 6.6;
         const color = isLeftSide ? '#000000' : personalityColor;
         const labelText =
-          variableDetailLevel >= 2
+          variableDetailLevel >= 3
             ? `C${v.color} T${v.tone} B${v.base}`
             : `C${v.color} T${v.tone}`;
 
@@ -374,7 +376,7 @@ function VariableArrows3D({
               />
             </mesh>
 
-            {variableDetailLevel >= 1 && (
+            {variableDetailLevel >= 2 && (
               <VariableLabel3D text={labelText} color={color} position={[colX, yText, rowZ + 1.15]} />
             )}
           </group>

@@ -201,12 +201,13 @@ export function BodyGraph2DSvg({ className = '' }: { className?: string }) {
       }
     });
 
-    // 5. 四箭頭（Variables）：箭頭置中在上，CTB 水平一排置中在箭頭正下方（例：C1 T1 B1）
+    // 5. 四箭頭（Variables）：整組向下平移置中 Ajna 中心；箭頭置中在上，CTB 水平一排置中在箭頭正下方
+    const ARROW_SHIFT_Y = 18;
     const ARROW_TEXT_ANCHOR: Record<'tl' | 'bl' | 'tr' | 'br', [number, number]> = {
-      tl: [28.92, 51.8],
-      bl: [28.92, 78.6],
-      tr: [158.02, 50.4],
-      br: [158.2, 78.6],
+      tl: [28.92, 51.8 + ARROW_SHIFT_Y],
+      bl: [28.92, 78.6 + ARROW_SHIFT_Y],
+      tr: [158.02, 50.4 + ARROW_SHIFT_Y],
+      br: [158.2, 78.6 + ARROW_SHIFT_Y],
     };
 
     derived.variables.forEach((v) => {
@@ -215,8 +216,9 @@ export function BodyGraph2DSvg({ className = '' }: { className?: string }) {
         viewMode === 1 ||
         (viewMode === 0 && v.side === 'design') ||
         (viewMode === 2 && v.side === 'personality');
-      const visible = sideVisible && (!isNodeArrow || planetToggles.nodes);
-      const showValues = visible && variableDetailLevel >= 1;
+      const groupAllowed = sideVisible && (!isNodeArrow || planetToggles.nodes);
+      const arrowVisible = groupAllowed && variableDetailLevel >= 1;
+      const showValues = groupAllowed && variableDetailLevel >= 2;
 
       const arrowLeft = root.querySelector<SVGElement>(`#arrow-${v.position}-left`);
       const arrowRight = root.querySelector<SVGElement>(`#arrow-${v.position}-right`);
@@ -225,12 +227,18 @@ export function BodyGraph2DSvg({ className = '' }: { className?: string }) {
       const textBase = root.querySelector<SVGElement>(`#text-${v.position}-base`);
 
       if (arrowLeft) {
+        arrowLeft.setAttribute('transform', `translate(0, ${ARROW_SHIFT_Y})`);
         arrowLeft.style.display = v.isLeft ? 'block' : 'none';
-        arrowLeft.style.visibility = visible ? 'visible' : 'hidden';
+        arrowLeft.style.visibility = groupAllowed ? 'visible' : 'hidden';
+        arrowLeft.style.opacity = arrowVisible ? '1' : '0';
+        arrowLeft.style.pointerEvents = groupAllowed ? 'all' : 'none';
       }
       if (arrowRight) {
+        arrowRight.setAttribute('transform', `translate(0, ${ARROW_SHIFT_Y})`);
         arrowRight.style.display = v.isLeft ? 'none' : 'block';
-        arrowRight.style.visibility = visible ? 'visible' : 'hidden';
+        arrowRight.style.visibility = groupAllowed ? 'visible' : 'hidden';
+        arrowRight.style.opacity = arrowVisible ? '1' : '0';
+        arrowRight.style.pointerEvents = groupAllowed ? 'all' : 'none';
       }
 
       // 隱藏舊版右側垂直排列的 tone/base，改由 textColor 單一水平置中於箭頭正下方呈現
@@ -248,7 +256,7 @@ export function BodyGraph2DSvg({ className = '' }: { className?: string }) {
         textColor.setAttribute('text-anchor', 'middle');
         textColor.setAttribute('font-size', '7.2');
         textColor.textContent =
-          variableDetailLevel >= 2
+          variableDetailLevel >= 3
             ? `C${v.color} T${v.tone} B${v.base}`
             : `C${v.color} T${v.tone}`;
         textColor.style.opacity = showValues ? '1' : '0';

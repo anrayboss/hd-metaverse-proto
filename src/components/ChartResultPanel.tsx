@@ -12,9 +12,10 @@ import { useWorldStore, VariableDetailLevel } from '../store/useWorldStore';
 import { InfoModalRequest } from './InfoModal';
 
 const VARIABLE_LEVEL_LABELS: Array<{ level: VariableDetailLevel; label: string }> = [
-  { level: 0, label: '純箭頭' },
-  { level: 1, label: 'CT' },
-  { level: 2, label: 'CTB' },
+  { level: 0, label: '隱藏' },
+  { level: 1, label: '純箭頭' },
+  { level: 2, label: 'CT' },
+  { level: 3, label: 'CTB' },
 ];
 
 function getFixingSymbol(state: FixingState): string {
@@ -347,11 +348,11 @@ export function ChartResultPanel({
             </div>
           </div>
 
-          {/* 四箭頭 Variables（左上=吸收、右上=動機、左下=環境、右下=視角；支援滾輪與控制 bar 切換 純箭頭 / CT / CTB） */}
+          {/* 四箭頭 Variables（左上=吸收、右上=動機、左下=環境、右下=視角；支援滾輪與控制 bar 切換 隱藏 / 純箭頭 / CT / CTB） */}
           <div
             ref={varSectionRef}
             className="hd-control-block hd-variables-section"
-            title="滑鼠滾輪或拖曳控制條切換：純箭頭 ↔ CT ↔ CTB"
+            title="滑鼠滾輪或拖曳控制條切換：隱藏 ↔ 純箭頭 ↔ CT ↔ CTB"
           >
             <div className="hd-control-title hd-var-header">
               <span>四箭頭數值</span>
@@ -363,13 +364,13 @@ export function ChartResultPanel({
                 type="range"
                 className="hd-var-slider"
                 min={0}
-                max={2}
+                max={3}
                 step={1}
                 value={variableDetailLevel}
                 onChange={(e) => setVariableDetailLevel(Number(e.target.value) as VariableDetailLevel)}
                 aria-label="四箭頭數值顯示層級"
               />
-              <div className="hd-var-ticks">
+              <div className="hd-var-ticks hd-var-ticks--4">
                 {VARIABLE_LEVEL_LABELS.map((item) => (
                   <button
                     key={item.level}
@@ -389,7 +390,8 @@ export function ChartResultPanel({
                 const sideVisible =
                   (v.side === 'design' && showDesignSide) ||
                   (v.side === 'personality' && showPersonalitySide);
-                const visible = sideVisible && (!isNodeArrow || planetToggles.nodes);
+                const visible =
+                  sideVisible && (!isNodeArrow || planetToggles.nodes) && variableDetailLevel >= 1;
                 return (
                   <div
                     key={v.position}
@@ -400,9 +402,9 @@ export function ChartResultPanel({
                       <span className="hd-var-arrow">{v.isLeft ? '◀' : '▶'}</span>
                       <span className="hd-var-label">{v.label}</span>
                     </div>
-                    {variableDetailLevel >= 1 && (
+                    {variableDetailLevel >= 2 && (
                       <div className="hd-var-ctb">
-                        {variableDetailLevel >= 2
+                        {variableDetailLevel >= 3
                           ? `C${v.color} T${v.tone} B${v.base}`
                           : `C${v.color} T${v.tone}`}
                       </div>

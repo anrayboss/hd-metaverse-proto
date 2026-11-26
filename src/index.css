@@ -1037,6 +1037,10 @@ body,
   gap: 4px;
 }
 
+.hd-var-ticks--4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
 .hd-var-tick {
   border: 1px solid rgba(148, 163, 184, 0.24);
   background: rgba(148, 163, 184, 0.08);

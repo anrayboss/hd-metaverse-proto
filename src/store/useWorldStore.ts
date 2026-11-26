@@ -24,8 +24,8 @@ export type ThemeMode = 'light' | 'dark';
 
 export type DisplayMode = 'bodygraph-2d' | 'mandala-2d' | 'universe-3d';
 
-/** 四箭頭數值顯示層級：0 = 純箭頭、1 = 箭頭+CT、2 = 箭頭+CTB */
-export type VariableDetailLevel = 0 | 1 | 2;
+/** 四箭頭數值顯示層級：0 = 隱藏、1 = 純箭頭、2 = 箭頭+CT、3 = 箭頭+CTB */
+export type VariableDetailLevel = 0 | 1 | 2 | 3;
 
 /** 日後製作完整新手導覽（紅太陽進 → 走廊 → 人體圖 → 黑太陽出）時改為 true */
 export const ENABLE_SUN_GUIDE = false;
@@ -193,7 +193,7 @@ export const useWorldStore = create<WorldState>((set, get) => ({
   stage: 'intro',
   chart: initialChart,
   viewMode: 1,
-  variableDetailLevel: 2,
+  variableDetailLevel: 3,
   planetToggles: DEFAULT_TOGGLES,
   isCalculatingChart: false,
   chartError: null,
@@ -347,7 +347,7 @@ export const useWorldStore = create<WorldState>((set, get) => ({
 
   stepVariableDetailLevel: (delta) =>
     set((s) => ({
-      variableDetailLevel: Math.max(0, Math.min(2, s.variableDetailLevel + delta)) as VariableDetailLevel,
+      variableDetailLevel: Math.max(0, Math.min(3, s.variableDetailLevel + delta)) as VariableDetailLevel,
     })),
 
   togglePlanet: (key) => {
