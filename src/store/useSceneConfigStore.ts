@@ -5,12 +5,19 @@ export interface SceneConfig {
   // 地板與曼陀羅
   floorY: number;
   floorDepth: number;
+  ringLabelY: number;
+  hexagramBaseY: number;
   hexagramY: number;
   hexagramScale: number;
   gateNumberY: number;
   gateNumberSize: number;
+  gateRingNumberY: number;
+  baseTextY: number;
   baseTextSize: number;
+  centerMarkerY: number;
   centerMarkerScale: number;
+  codonTokenY: number;
+  avatarMinY: number;
   // 1/64 閘門走廊
   corridorWallHeight: number;
   corridorWallOpacity: number;

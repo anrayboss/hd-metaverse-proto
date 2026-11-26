@@ -19,13 +19,17 @@ interface GateHexagramProps {
   isBlackSun: boolean;
   isSelected: boolean;
   isLight: boolean;
-  floorY: number;
+  hexagramBaseY: number;
   hexagramY: number;
   hexagramScale: number;
   gateNumberY: number;
   gateNumberSize: number;
+  gateRingNumberY: number;
+  baseTextY: number;
   baseTextSize: number;
+  centerMarkerY: number;
   centerMarkerScale: number;
+  codonTokenY: number;
   centerInfo: CenterInfo;
   onEnterCorridor: (gateNumber: number) => void;
 }
@@ -70,13 +74,17 @@ function GateHexagram({
   isBlackSun,
   isSelected,
   isLight,
-  floorY,
+  hexagramBaseY,
   hexagramY,
   hexagramScale,
   gateNumberY,
   gateNumberSize,
+  gateRingNumberY,
+  baseTextY,
   baseTextSize,
+  centerMarkerY,
   centerMarkerScale,
+  codonTokenY,
   centerInfo,
   onEnterCorridor,
 }: GateHexagramProps) {
@@ -86,31 +94,11 @@ function GateHexagram({
   const cosA = Math.cos(gate.angleRad);
   const sinA = Math.sin(gate.angleRad);
 
-  const hexPos: [number, number, number] = [
-    cosA * RING_RADII.hexagram,
-    Math.max(0.6, floorY + 0.1),
-    sinA * RING_RADII.hexagram,
-  ];
-  const basePos: [number, number, number] = [
-    cosA * RING_RADII.base,
-    Math.max(0.6, floorY + 0.12),
-    sinA * RING_RADII.base,
-  ];
-  const numPos: [number, number, number] = [
-    cosA * RING_RADII.gateNumber,
-    Math.max(1.4, floorY + 0.9),
-    sinA * RING_RADII.gateNumber,
-  ];
-  const centerPos: [number, number, number] = [
-    cosA * RING_RADII.centerBlock,
-    Math.max(1.1, floorY + 0.6),
-    sinA * RING_RADII.centerBlock,
-  ];
-  const codonPos: [number, number, number] = [
-    cosA * RING_RADII.codonToken,
-    Math.max(1.35, floorY + 0.85),
-    sinA * RING_RADII.codonToken,
-  ];
+  const hexPos: [number, number, number] = [cosA * RING_RADII.hexagram, hexagramBaseY, sinA * RING_RADII.hexagram];
+  const basePos: [number, number, number] = [cosA * RING_RADII.base, baseTextY, sinA * RING_RADII.base];
+  const numPos: [number, number, number] = [cosA * RING_RADII.gateNumber, gateRingNumberY, sinA * RING_RADII.gateNumber];
+  const centerPos: [number, number, number] = [cosA * RING_RADII.centerBlock, centerMarkerY, sinA * RING_RADII.centerBlock];
+  const codonPos: [number, number, number] = [cosA * RING_RADII.codonToken, codonTokenY, sinA * RING_RADII.codonToken];
 
   // 讓卦象面向圓心
   const rotY = -gate.angleRad + Math.PI / 2;
@@ -391,7 +379,7 @@ export function MandalaRing3D() {
   }, []);
 
   const lineY = config.floorY + 0.05;
-  const labelY = Math.max(0.6, config.floorY + 0.1);
+  const labelY = config.ringLabelY;
 
   return (
     <group>
@@ -454,13 +442,17 @@ export function MandalaRing3D() {
           isBlackSun={chart.blackSun.gate === gate.gate}
           isSelected={selected?.type === 'gate' && selected.gate.gate === gate.gate}
           isLight={isLight}
-          floorY={config.floorY}
+          hexagramBaseY={config.hexagramBaseY}
           hexagramY={config.hexagramY}
           hexagramScale={config.hexagramScale}
           gateNumberY={config.gateNumberY}
           gateNumberSize={config.gateNumberSize}
+          gateRingNumberY={config.gateRingNumberY}
+          baseTextY={config.baseTextY}
           baseTextSize={config.baseTextSize}
+          centerMarkerY={config.centerMarkerY}
           centerMarkerScale={config.centerMarkerScale}
+          codonTokenY={config.codonTokenY}
           centerInfo={centerMap[gate.centerId]}
           onEnterCorridor={(gateNum) => enterCorridorByGate(gateNum, 'in', 85)}
         />

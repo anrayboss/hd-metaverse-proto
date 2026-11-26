@@ -172,8 +172,8 @@ export function CameraRig() {
 
     const modeChanged = prevModeRef.current !== currentMode;
 
-    const minCamY = Math.max(0.6, config.floorY + 0.1);
-    const minAvatarY = Math.max(0.6, config.floorY + 0.1);
+    const minCamY = Math.max(config.avatarMinY, config.floorY + 0.1);
+    const minAvatarY = config.avatarMinY;
 
     // 1. 人體圖內部自由探索（全第三人稱：controls.target 永遠綁定在 avatarState.position）
     if (currentMode === 'interior' && interiorSpace) {
