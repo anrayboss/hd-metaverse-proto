@@ -24,6 +24,7 @@ function ClickableCorridorWall({
   corridorLength,
   wallHeight,
   wallOpacity,
+  floorY,
   corridorRadius,
   dirSign,
   targetGateNumber,
@@ -35,6 +36,7 @@ function ClickableCorridorWall({
   corridorLength: number;
   wallHeight: number;
   wallOpacity: number;
+  floorY: number;
   corridorRadius: number;
   dirSign: number;
   targetGateNumber: number;
@@ -57,7 +59,7 @@ function ClickableCorridorWall({
     <group
       position={[
         Math.cos(wallAngle) * corridorMidR,
-        wallHeight / 2,
+        floorY + wallHeight / 2,
         Math.sin(wallAngle) * corridorMidR,
       ]}
       rotation={[0, -wallAngle, 0]}
@@ -369,7 +371,7 @@ export function PhysiologyCorridors3D() {
           <mesh
             key={gate.gate}
             geometry={fullWedgeFloorGeometry}
-            position={[0, 0.11, 0]}
+            position={[0, config.floorY + 0.04, 0]}
             rotation={[0, -gate.angleRad, 0]}
             onClick={(e) => {
               e.stopPropagation();
@@ -403,6 +405,7 @@ export function PhysiologyCorridors3D() {
             corridorLength={corridorLength}
             wallHeight={wallHeight}
             wallOpacity={config.corridorWallOpacity}
+            floorY={config.floorY}
             corridorRadius={corridorRadius}
             dirSign={dirSign}
             targetGateNumber={prevGate.gate}
@@ -415,6 +418,7 @@ export function PhysiologyCorridors3D() {
             corridorLength={corridorLength}
             wallHeight={wallHeight}
             wallOpacity={config.corridorWallOpacity}
+            floorY={config.floorY}
             corridorRadius={corridorRadius}
             dirSign={dirSign}
             targetGateNumber={nextGate.gate}

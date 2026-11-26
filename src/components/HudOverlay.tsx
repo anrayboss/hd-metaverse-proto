@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { CENTERS, MANDALA_GATES, QUADRANT_META, RING_RADII } from '../data/mandalaData';
 import { CITY_OPTIONS, DEFAULT_CITY } from '../data/cities';
-import { JourneyStage, useWorldStore } from '../store/useWorldStore';
+import { ENABLE_SUN_GUIDE, JourneyStage, useWorldStore } from '../store/useWorldStore';
 import { ChartResultPanel } from './ChartResultPanel';
 import { InfoModal, InfoModalRequest } from './InfoModal';
 
-const STAGE_STEPS: Array<{ id: JourneyStage; label: string }> = [
+const ALL_STAGE_STEPS: Array<{ id: JourneyStage; label: string }> = [
   { id: 'intro', label: '0. 鳥瞰入口' },
   { id: 'red-sun', label: '1. 紅太陽卦象' },
   { id: 'corridor', label: '2. 閘門走廊 (In)' },
@@ -13,6 +13,10 @@ const STAGE_STEPS: Array<{ id: JourneyStage; label: string }> = [
   { id: 'black-sun', label: '4. 黑太陽走廊 (Out)' },
   { id: 'free-roam', label: '5. 鳥瞰自由探索' },
 ];
+
+const STAGE_STEPS = ENABLE_SUN_GUIDE
+  ? ALL_STAGE_STEPS
+  : ALL_STAGE_STEPS.filter((s) => s.id === 'intro' || s.id === 'free-roam');
 
 const STATIONS_IN = [
   { r: RING_RADII.quadrant, label: '象限' },
@@ -82,7 +86,7 @@ export function HudOverlay() {
       true
     );
     if (res) {
-      setStage('red-sun');
+      setStage(ENABLE_SUN_GUIDE ? 'red-sun' : 'free-roam');
     }
   };
 

@@ -22,6 +22,9 @@ import { DEFAULT_CITY } from '../data/cities';
 
 export type ThemeMode = 'light' | 'dark';
 
+/** 日後製作完整新手導覽（紅太陽進 → 走廊 → 人體圖 → 黑太陽出）時改為 true */
+export const ENABLE_SUN_GUIDE = false;
+
 export type JourneyStage =
   | 'intro'
   | 'red-sun'
@@ -347,7 +350,7 @@ export const useWorldStore = create<WorldState>((set, get) => ({
 
   setCorridorRadius: (r) =>
     set({
-      corridorRadius: Math.max(23, Math.min(87, r)),
+      corridorRadius: Math.max(23, Math.min(91, r)),
     }),
 
   toggleCorridorDirection: () =>

@@ -21,6 +21,7 @@ export function CameraRig() {
   const prevModeRef = useRef<RigMode>('overview');
   const prevCorridorDirRef = useRef<'in' | 'out'>('in');
   const prevFreeRoamTickRef = useRef(0);
+  const prevFreeRRef = useRef<number | null>(null);
   const corridorGlideRef = useRef(false);
   const freeRoamGlideRef = useRef(false);
 
@@ -171,8 +172,8 @@ export function CameraRig() {
 
     const modeChanged = prevModeRef.current !== currentMode;
 
-    const minCamY = config.floorY + 0.15;
-    const minAvatarY = config.floorY + 0.35;
+    const minCamY = Math.max(0.6, config.floorY + 0.1);
+    const minAvatarY = Math.max(0.6, config.floorY + 0.1);
 
     // 1. 人體圖內部自由探索（全第三人稱：controls.target 永遠綁定在 avatarState.position）
     if (currentMode === 'interior' && interiorSpace) {
@@ -343,6 +344,23 @@ export function CameraRig() {
         return;
       }
 
+      // 走廊外口穿透卦象無縫走出曼陀羅（R >= 89.5 且朝外時進入自由探索）
+      if (nextR >= 89.5 && corridorDirection === 'out') {
+        const exitR = 91.5;
+        avatarState.position.set(Math.cos(a) * exitR, corridorY, Math.sin(a) * exitR);
+        controls.target.copy(avatarState.position);
+        camera.position.set(
+          Math.cos(a) * (exitR - 6.8),
+          corridorY + 1.9,
+          Math.sin(a) * (exitR - 6.8)
+        );
+        controls.update();
+        prevFreeRRef.current = exitR;
+        useWorldStore.setState({ stage: 'free-roam', interiorSpace: null, cameraFocusTarget: null });
+        prevModeRef.current = currentMode;
+        return;
+      }
+
       if (nextR !== corridorRadius) {
         useWorldStore.getState().setCorridorRadius(nextR);
       }
@@ -482,10 +500,40 @@ export function CameraRig() {
       const freeR = Math.hypot(avatarState.position.x, avatarState.position.z);
       const freeY = avatarState.position.y;
       if (freeR < 21.5 && freeY < 4.8 && freeY > -1.0) {
+        prevFreeRRef.current = freeR;
         useWorldStore.getState().enterBodyGraphInteriorAuto();
         prevModeRef.current = currentMode;
         return;
       }
+
+      // 從曼陀羅外側向內穿透卦象（R = 88）無縫走進對應 1/64 閘門走廊
+      if (
+        prevFreeRRef.current !== null &&
+        prevFreeRRef.current >= 89.5 &&
+        freeR < 89.5 &&
+        freeR >= 84.0 &&
+        freeY >= minAvatarY &&
+        freeY < 6.5
+      ) {
+        const avatarAngle = Math.atan2(avatarState.position.z, avatarState.position.x);
+        let nearestGate = MANDALA_GATES[0];
+        let bestDiff = Infinity;
+        for (const g of MANDALA_GATES) {
+          let d = Math.abs(g.angleRad - avatarAngle);
+          if (d > Math.PI) d = Math.PI * 2 - d;
+          if (d < bestDiff) {
+            bestDiff = d;
+            nearestGate = g;
+          }
+        }
+        prevFreeRRef.current = 85.5;
+        useWorldStore.getState().enterCorridorByGate(nearestGate.gate, 'in', 85.5);
+        prevModeRef.current = currentMode;
+        return;
+      }
+      prevFreeRRef.current = freeR;
+    } else {
+      prevFreeRRef.current = null;
     }
 
     controls.update();

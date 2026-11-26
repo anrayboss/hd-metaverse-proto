@@ -19,6 +19,7 @@ interface GateHexagramProps {
   isBlackSun: boolean;
   isSelected: boolean;
   isLight: boolean;
+  floorY: number;
   hexagramY: number;
   hexagramScale: number;
   gateNumberY: number;
@@ -69,6 +70,7 @@ function GateHexagram({
   isBlackSun,
   isSelected,
   isLight,
+  floorY,
   hexagramY,
   hexagramScale,
   gateNumberY,
@@ -84,11 +86,31 @@ function GateHexagram({
   const cosA = Math.cos(gate.angleRad);
   const sinA = Math.sin(gate.angleRad);
 
-  const hexPos: [number, number, number] = [cosA * RING_RADII.hexagram, 0.25, sinA * RING_RADII.hexagram];
-  const basePos: [number, number, number] = [cosA * RING_RADII.base, 0.4, sinA * RING_RADII.base];
-  const numPos: [number, number, number] = [cosA * RING_RADII.gateNumber, 1.4, sinA * RING_RADII.gateNumber];
-  const centerPos: [number, number, number] = [cosA * RING_RADII.centerBlock, 0.6, sinA * RING_RADII.centerBlock];
-  const codonPos: [number, number, number] = [cosA * RING_RADII.codonToken, 0.6, sinA * RING_RADII.codonToken];
+  const hexPos: [number, number, number] = [
+    cosA * RING_RADII.hexagram,
+    Math.max(0.6, floorY + 0.1),
+    sinA * RING_RADII.hexagram,
+  ];
+  const basePos: [number, number, number] = [
+    cosA * RING_RADII.base,
+    Math.max(0.6, floorY + 0.12),
+    sinA * RING_RADII.base,
+  ];
+  const numPos: [number, number, number] = [
+    cosA * RING_RADII.gateNumber,
+    Math.max(1.4, floorY + 0.9),
+    sinA * RING_RADII.gateNumber,
+  ];
+  const centerPos: [number, number, number] = [
+    cosA * RING_RADII.centerBlock,
+    Math.max(1.1, floorY + 0.6),
+    sinA * RING_RADII.centerBlock,
+  ];
+  const codonPos: [number, number, number] = [
+    cosA * RING_RADII.codonToken,
+    Math.max(1.35, floorY + 0.85),
+    sinA * RING_RADII.codonToken,
+  ];
 
   // 讓卦象面向圓心
   const rotY = -gate.angleRad + Math.PI / 2;
@@ -351,6 +373,13 @@ export function MandalaRing3D() {
       const a = -Math.PI / 2 - ((midIdx - 57.5) / 64) * Math.PI * 2;
       items.push({ key: `gh-${i}`, text: g.godhead, r: RING_RADII.godhead, angle: a, size: 1.55 });
     }
+    // 十二星座（每 ~5.33 閘門 1 個）
+    for (let i = 0; i < 12; i++) {
+      const midIdx = ((i + 0.5) * (64 / 12) - 2 + 64) % 64;
+      const g = MANDALA_GATES[Math.floor(midIdx)];
+      const a = -Math.PI / 2 - ((midIdx - 57.5) / 64) * Math.PI * 2;
+      items.push({ key: `zod-${i}`, text: g.zodiac, r: RING_RADII.zodiac, angle: a, size: 1.45 });
+    }
     // 易經八卦（每 8 閘門 1 個）
     for (let i = 0; i < 8; i++) {
       const midIdx = (i * 8 + 4 + 3.5) % 64;
@@ -360,6 +389,9 @@ export function MandalaRing3D() {
     }
     return items;
   }, []);
+
+  const lineY = config.floorY + 0.05;
+  const labelY = Math.max(0.6, config.floorY + 0.1);
 
   return (
     <group>
@@ -374,7 +406,7 @@ export function MandalaRing3D() {
 
       {/* 10 層同心圓清晰分界線 */}
       {concentricRings.map((ring, idx) => (
-        <mesh key={idx} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.09, 0]}>
+        <mesh key={idx} rotation={[-Math.PI / 2, 0, 0]} position={[0, lineY, 0]}>
           <ringGeometry args={[ring.r - ring.w / 2, ring.r + ring.w / 2, 128]} />
           <meshBasicMaterial
             color={isLight ? '#64748b' : '#475569'}
@@ -387,7 +419,7 @@ export function MandalaRing3D() {
 
       {/* 64 等分 1/64 閘門放射分界線 */}
       {sectorDividers.map((s) => (
-        <mesh key={s.key} position={s.pos} rotation={[0, s.rotY, 0]}>
+        <mesh key={s.key} position={[s.pos[0], lineY, s.pos[2]]} rotation={[0, s.rotY, 0]}>
           <boxGeometry args={[s.len, 0.06, 0.14]} />
           <meshBasicMaterial
             color={isLight ? '#94a3b8' : '#334155'}
@@ -397,11 +429,11 @@ export function MandalaRing3D() {
         </mesh>
       ))}
 
-      {/* 鳥瞰圖象限／神格／八卦環文字 */}
+      {/* 鳥瞰圖象限／神格／星座／八卦環文字（最低 Y=0.6 防陷進地板） */}
       {ringLabels.map((lbl) => (
         <Text
           key={lbl.key}
-          position={[Math.cos(lbl.angle) * lbl.r, 0.16, Math.sin(lbl.angle) * lbl.r]}
+          position={[Math.cos(lbl.angle) * lbl.r, labelY, Math.sin(lbl.angle) * lbl.r]}
           rotation={[-Math.PI / 2, 0, -lbl.angle - Math.PI / 2]}
           fontSize={lbl.size}
           color={isLight ? '#1e293b' : '#cbd5e1'}
@@ -422,6 +454,7 @@ export function MandalaRing3D() {
           isBlackSun={chart.blackSun.gate === gate.gate}
           isSelected={selected?.type === 'gate' && selected.gate.gate === gate.gate}
           isLight={isLight}
+          floorY={config.floorY}
           hexagramY={config.hexagramY}
           hexagramScale={config.hexagramScale}
           gateNumberY={config.gateNumberY}
