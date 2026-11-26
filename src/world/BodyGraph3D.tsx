@@ -351,7 +351,7 @@ function VariableArrows3D({
         const isLeftSide = v.position === 'tl' || v.position === 'bl';
         const rowZ = v.position === 'tl' || v.position === 'tr' ? topZ : botZ;
         const colX = isLeftSide ? -6.6 : 6.6;
-        const color = v.side === 'design' ? designColor : personalityColor;
+        const color = isLeftSide ? '#000000' : personalityColor;
         const labelText =
           variableDetailLevel >= 2
             ? `C${v.color} T${v.tone} B${v.base}`
