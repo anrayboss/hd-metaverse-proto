@@ -1,4 +1,3 @@
-import bundledRecords from '../data/chartRecords.json';
 import { ActivationSide, CelestialBodyKey, FixingState } from './hdCalculator';
 
 export interface SavedActivationItem {
@@ -42,20 +41,15 @@ export interface ChartRecordEntry {
 const STORAGE_KEY = 'hd-metaverse-chart-records-v1';
 
 export function loadChartRecords(): ChartRecordEntry[] {
-  const fromBundle = Array.isArray(bundledRecords) ? (bundledRecords as ChartRecordEntry[]) : [];
-  if (typeof window === 'undefined') return fromBundle;
+  if (typeof window === 'undefined') return [];
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return fromBundle;
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return fromBundle;
-    // 合併本機 JSON 與 localStorage（以 id 去重，較新優先）
-    const map = new Map<string, ChartRecordEntry>();
-    for (const r of fromBundle) map.set(r.id, r);
-    for (const r of parsed as ChartRecordEntry[]) map.set(r.id, r);
-    return Array.from(map.values()).sort((a, b) => b.savedAt.localeCompare(a.savedAt));
+    if (!Array.isArray(parsed)) return [];
+    return (parsed as ChartRecordEntry[]).sort((a, b) => b.savedAt.localeCompare(a.savedAt));
   } catch {
-    return fromBundle;
+    return [];
   }
 }
 
@@ -64,9 +58,7 @@ export function buildRecordId(name: string, birthDate: string, birthTime: string
 }
 
 /**
- * 新增或更新一筆 30 星體跑圖紀錄：
- * 1. 立即同步寫入瀏覽器 localStorage
- * 2. 若在 DEV 本機開發環境，同步 POST /__save-chart-records 寫回專案 src/data/chartRecords.json
+ * 新增或更新一筆 30 星體跑圖紀錄（純瀏覽器 localStorage 持久化，不寫入版控檔案）
  */
 export async function upsertChartRecord(
   entry: ChartRecordEntry
@@ -83,19 +75,5 @@ export async function upsertChartRecord(
     }
   }
 
-  let savedToDisk = false;
-  if (typeof fetch !== 'undefined' && import.meta.env?.DEV) {
-    try {
-      const res = await fetch('/__save-chart-records', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(nextRecords),
-      });
-      savedToDisk = res.ok;
-    } catch {
-      savedToDisk = false;
-    }
-  }
-
-  return { records: nextRecords, savedToDisk };
+  return { records: nextRecords, savedToDisk: false };
 }

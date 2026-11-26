@@ -39,7 +39,6 @@ function localJsonPersistencePlugin(): Plugin {
     name: 'local-json-persistence',
     configureServer(server) {
       registerJsonPost(server.middlewares, '/__save-scene-config', 'src/data/sceneConfig.json');
-      registerJsonPost(server.middlewares, '/__save-chart-records', 'src/data/chartRecords.json');
     },
   };
 }

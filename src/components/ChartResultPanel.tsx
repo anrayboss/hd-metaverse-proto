@@ -48,7 +48,6 @@ export function ChartResultPanel({
   const viewMode = useWorldStore((s) => s.viewMode);
   const planetToggles = useWorldStore((s) => s.planetToggles);
   const chartRecords = useWorldStore((s) => s.chartRecords);
-  const lastSavedToDisk = useWorldStore((s) => s.lastSavedToDisk);
   const setViewMode = useWorldStore((s) => s.setViewMode);
   const togglePlanet = useWorldStore((s) => s.togglePlanet);
   const loadSavedRecord = useWorldStore((s) => s.loadSavedRecord);
@@ -135,8 +134,8 @@ export function ChartResultPanel({
               </option>
             ))}
           </select>
-          <span className="hd-saved-pill" title="已自動儲存 30 筆天體資料">
-            {lastSavedToDisk ? '💾 已寫入 JSON' : `🗂 ${chartRecords.length} 筆`}
+          <span className="hd-saved-pill" title="已存於瀏覽器 localStorage">
+            {`🗂 ${chartRecords.length} 筆`}
           </span>
         </div>
       )}
@@ -320,7 +319,7 @@ export function ChartResultPanel({
             </div>
           </div>
 
-          {/* 四箭頭 Variables（隱藏南北交點時，連動隱藏 bl 環境與 br 視角） */}
+          {/* 四箭頭 Variables（左上=吸收、右上=動機、左下=環境、右下=視角；隱藏南北交時連動隱藏環境與視角） */}
           <div className="hd-variables-grid">
             {derived.variables.map((v) => {
               const isNodeArrow = v.position === 'bl' || v.position === 'br';
@@ -335,6 +334,7 @@ export function ChartResultPanel({
                   title={v.label}
                 >
                   <span className="hd-var-arrow">{v.isLeft ? '◀' : '▶'}</span>
+                  <span className="hd-var-label">{v.label}</span>
                   <span className="hd-var-ct">
                     C{v.color} T{v.tone}
                   </span>

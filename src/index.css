@@ -1328,21 +1328,19 @@ body,
   background: rgba(242, 186, 121, 0.25);
 }
 
-/* 2D 本命圖三欄（無意識星體 + SVG 人體圖 + 意識星體） */
+/* 2D 本命圖純淨置中大圖（無兩側閘門列表） */
 .flat-bodygraph-layout {
   width: 100%;
   flex: 1;
   min-height: 0;
-  display: grid;
-  grid-template-columns: 116px minmax(220px, 340px) 116px;
+  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
 }
 
 .flat-bodygraph-center {
-  width: 100%;
-  height: min(64vh, 560px);
+  width: min(360px, 78vw);
+  height: min(68vh, 600px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1484,7 +1482,6 @@ body,
   width: 24%;
   height: 41.5%;
   transform: translate(-50%, -50%);
-  pointer-events: none;
 }
 
 .bodygraph-2d-svg--mandala svg {

@@ -474,8 +474,8 @@ export function MandalaRing3D() {
         <GateHexagram
           key={gate.gate}
           gate={gate}
-          isRedSun={chart.redSun.gate === gate.gate}
-          isBlackSun={chart.blackSun.gate === gate.gate}
+          isRedSun={ENABLE_SUN_GUIDE && chart.redSun.gate === gate.gate}
+          isBlackSun={ENABLE_SUN_GUIDE && chart.blackSun.gate === gate.gate}
           isSelected={selected?.type === 'gate' && selected.gate.gate === gate.gate}
           isLight={isLight}
           hexagramBaseY={config.hexagramBaseY}

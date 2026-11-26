@@ -4,19 +4,20 @@ import { getActivePlanetList, PLANET_SYMBOLS } from '../engine/hdCalculator';
 import { useWorldStore } from '../store/useWorldStore';
 import { BodyGraph2DSvg } from './BodyGraph2DSvg';
 
-const ZODIAC_RING: Array<{ name: string; symbol: string; startLonDeg: number }> = [
-  { name: '牡羊', symbol: '♈', startLonDeg: 0 },
-  { name: '金牛', symbol: '♉', startLonDeg: 30 },
-  { name: '雙子', symbol: '♊', startLonDeg: 60 },
-  { name: '巨蟹', symbol: '♋', startLonDeg: 90 },
-  { name: '獅子', symbol: '♌', startLonDeg: 120 },
-  { name: '處女', symbol: '♍', startLonDeg: 150 },
-  { name: '天秤', symbol: '♎', startLonDeg: 180 },
-  { name: '天蠍', symbol: '♏', startLonDeg: 210 },
-  { name: '射手', symbol: '♐', startLonDeg: 240 },
-  { name: '摩羯', symbol: '♑', startLonDeg: 270 },
-  { name: '水瓶', symbol: '♒', startLonDeg: 300 },
-  { name: '雙魚', symbol: '♓', startLonDeg: 330 },
+// 與 3D MandalaRing3D / mandalaData.ts 完全一致的 12 星座順序（從 wheelIndex = 62 水瓶座開始逆時針排列）
+const ZODIAC_RING_3D_ORDER: Array<{ name: string; symbol: string }> = [
+  { symbol: '♒', name: '水瓶' },
+  { symbol: '♓', name: '雙魚' },
+  { symbol: '♈', name: '牡羊' },
+  { symbol: '♉', name: '金牛' },
+  { symbol: '♊', name: '雙子' },
+  { symbol: '♋', name: '巨蟹' },
+  { symbol: '♌', name: '獅子' },
+  { symbol: '♍', name: '處女' },
+  { symbol: '♎', name: '天秤' },
+  { symbol: '♏', name: '天蠍' },
+  { symbol: '♐', name: '射手' },
+  { symbol: '♑', name: '魔羯' },
 ];
 
 const CX = 500;
@@ -28,12 +29,9 @@ const R_CORE_CIRCLE = 240;
 
 const SECTOR_DEG = 360 / 64; // 5.625°
 
-/** 將黃經度數轉成與 MANDALA_GATES 完全一致的 2D SVG 角度（rad） */
-function longitudeToSvgRad(lonDeg: number): number {
-  const offsetFromGate41 = (((lonDeg - 302.0) % 360) + 360) % 360;
-  const wheelFloat = offsetFromGate41 / 5.625;
-  // 對齊 mandalaData.ts：wheelIndex 對應 angleRad = -((wheelIndex + 40.5) / 64) * 2π - π/2
-  return -((wheelFloat + 40.5) / 64) * Math.PI * 2 - Math.PI / 2;
+/** 與 3D MandalaRing3D / mandalaData.ts 完全一致的 wheelIndex → 角度公式 */
+function wheelIndexToSvgRad(wheelFloat: number): number {
+  return -Math.PI / 2 - ((wheelFloat - 57.5) / 64) * Math.PI * 2;
 }
 
 function polar(r: number, rad: number): [number, number] {
@@ -54,8 +52,8 @@ function describeArcWedge(rInner: number, rOuter: number, startRad: number, endR
  * 基礎版 2D 曼陀羅：
  * 最外圈：64 易經卦象（六爻）＋ 啟動星體標記
  * 中間圈：64 閘門阿拉伯數字（點擊可直入 3D 該閘門走廊）
- * 內圈：12 星座符號與中文名（對齊真實黃經）
- * 正中央：2D 平面人體圖（body-graph.svg）
+ * 內圈：12 星座符號與中文名（與 3D 曼陀羅完全同源對齊）
+ * 正中央：可點擊的 2D 平面人體圖（body-graph.svg）
  */
 export function BasicMandala2D() {
   const chart = useWorldStore((s) => s.chart);
@@ -110,10 +108,13 @@ export function BasicMandala2D() {
         <circle cx={CX} cy={CY} r={R_INNER_ZODIAC} fill={ringBg} stroke={strokeColor} strokeWidth={1.4} />
         <circle cx={CX} cy={CY} r={R_CORE_CIRCLE} fill={ringAltBg} stroke={strokeColor} strokeWidth={1.6} />
 
-        {/* 內圈：12 星座分隔線與星座符號 */}
-        {ZODIAC_RING.map((z) => {
-          const startRad = longitudeToSvgRad(z.startLonDeg);
-          const midRad = longitudeToSvgRad(z.startLonDeg + 15);
+        {/* 內圈：12 星座分隔線與星座符號（完全對齊 3D MandalaRing3D 公式） */}
+        {ZODIAC_RING_3D_ORDER.map((z, i) => {
+          // 每個閘門中心在 wheelIndex，邊界在 wheelIndex - 0.5；第 i 星座從 idx = i*(64/12) - 2 開始
+          const startIdx = i * (64 / 12) - 2 - 0.5;
+          const midIdx = (i + 0.5) * (64 / 12) - 2 - 0.5;
+          const startRad = wheelIndexToSvgRad(startIdx);
+          const midRad = wheelIndexToSvgRad(midIdx);
           const [lx1, ly1] = polar(R_CORE_CIRCLE, startRad);
           const [lx2, ly2] = polar(R_INNER_ZODIAC, startRad);
           const [tx, ty] = polar((R_CORE_CIRCLE + R_INNER_ZODIAC) / 2, midRad);
@@ -232,7 +233,7 @@ export function BasicMandala2D() {
               {/* 最外圈：易經六爻卦象（初爻在內、上爻在外） */}
               <g transform={`translate(${hexX}, ${hexY}) rotate(${rotDeg})`}>
                 {gate.lines.map((isYang, idx) => {
-                  const y = (2.5 - idx) * 5.2; // idx=0 在內側 (+y)，idx=5 在外側 (-y)
+                  const y = (2.5 - idx) * 5.2;
                   if (isYang === 1) {
                     return (
                       <line
@@ -291,7 +292,7 @@ export function BasicMandala2D() {
         })}
       </svg>
 
-      {/* 正中央：內嵌 2D 平面人體圖（body-graph.svg） */}
+      {/* 正中央：可點擊的 2D 平面人體圖（body-graph.svg） */}
       <div className="basic-mandala-core">
         <BodyGraph2DSvg className="bodygraph-2d-svg--mandala" />
       </div>

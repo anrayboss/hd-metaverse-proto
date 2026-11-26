@@ -429,35 +429,36 @@ export function analyzeBodygraph(
   const dNode = design['North Node'];
   const pNode = personality['North Node'];
 
+  // 順序對應 2x2 網格：左上=吸收、右上=動機、左下=環境、右下=視角
   const variables: VariableArrow[] = [
     {
       position: 'tl',
       side: 'design',
-      label: '消化 Digestion',
+      label: '吸收',
       isLeft: dSun.tone <= 3,
       color: dSun.color,
       tone: dSun.tone,
     },
     {
-      position: 'bl',
-      side: 'design',
-      label: '環境 Environment',
-      isLeft: dNode.tone <= 3,
-      color: dNode.color,
-      tone: dNode.tone,
-    },
-    {
       position: 'tr',
       side: 'personality',
-      label: '動機 Motivation',
+      label: '動機',
       isLeft: pSun.tone <= 3,
       color: pSun.color,
       tone: pSun.tone,
     },
     {
+      position: 'bl',
+      side: 'design',
+      label: '環境',
+      isLeft: dNode.tone <= 3,
+      color: dNode.color,
+      tone: dNode.tone,
+    },
+    {
       position: 'br',
       side: 'personality',
-      label: '視角 Perspective',
+      label: '視角',
       isLeft: pNode.tone <= 3,
       color: pNode.color,
       tone: pNode.tone,

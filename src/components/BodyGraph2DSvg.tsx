@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { CenterId, GATE_BY_NUMBER } from '../data/mandalaData';
+import { CENTERS, CenterId, GATE_BY_NUMBER } from '../data/mandalaData';
+import { useSceneConfigStore } from '../store/useSceneConfigStore';
 import { useWorldStore } from '../store/useWorldStore';
 
 const BRAND_COLOR = '#f2ba79';
@@ -20,6 +21,10 @@ const CENTER_ID_TO_SVG_ID: Record<CenterId, string> = {
   solar: 'center-solar-plexus',
   root: 'center-root',
 };
+
+const SVG_ID_TO_CENTER_ID: Record<string, CenterId> = Object.fromEntries(
+  Object.entries(CENTER_ID_TO_SVG_ID).map(([k, v]) => [v, k as CenterId])
+);
 
 let cachedSvgMarkup: string | null = null;
 let svgFetchPromise: Promise<string> | null = null;
@@ -42,7 +47,10 @@ function loadBodyGraphSvg(): Promise<string> {
 
 /**
  * 沿用過往 2D 跑圖專案的 body-graph.svg 向量人體圖：
- * 100% 還原九中心著色、64 閘門單/雙色、coveringGates 白色底覆蓋、圓圈與四箭頭（含南北交連動隱藏）
+ * - 100% 還原九中心著色、64 閘門單/雙色、coveringGates 白色底覆蓋、圓圈與四箭頭（含南北交連動隱藏）
+ * - 點擊互動：
+ *   1. 點擊閘門數字（透穿命中定義圈圈）、閘門定義圈圈或通道填色範圍 → 切換至 3D 並飛入該閘門走廊
+ *   2. 點擊九中心（排除閘門定義圈圈範圍）→ 切換至 3D 並進入該中心內部空間
  */
 export function BodyGraph2DSvg({ className = '' }: { className?: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -52,6 +60,9 @@ export function BodyGraph2DSvg({ className = '' }: { className?: string }) {
   const viewMode = useWorldStore((s) => s.viewMode);
   const planetToggles = useWorldStore((s) => s.planetToggles);
   const theme = useWorldStore((s) => s.theme);
+  const setDisplayMode = useWorldStore((s) => s.setDisplayMode);
+  const enterCorridorByGate = useWorldStore((s) => s.enterCorridorByGate);
+  const enterCenterInterior = useWorldStore((s) => s.enterCenterInterior);
 
   useEffect(() => {
     if (svgMarkup) return;
@@ -77,27 +88,48 @@ export function BodyGraph2DSvg({ className = '' }: { className?: string }) {
       svgEl.style.display = 'block';
     }
 
+    // 讓轉外框的閘門數字不攔截指標事件，點擊數字時直接精準透穿到底下的 #gate-circle-<N>
+    const numberOutlineGroup = root.querySelector<SVGElement>('[id^="九中心數字"]');
+    if (numberOutlineGroup) {
+      numberOutlineGroup.style.pointerEvents = 'none';
+    }
+
     const undefinedCenterFill = theme === 'light' ? '#ffffff' : '#1e293b';
     const personalityColor = theme === 'light' ? COLOR_GATE_PERSONALITY : '#e2e8f0';
 
-    // 1. 重置全部九中心
+    // 1. 重置全部九中心（啟用點擊游標）
     Object.values(CENTER_ID_TO_SVG_ID).forEach((svgId) => {
       const el = root.querySelector<SVGElement>(`#${svgId}`);
-      if (el) el.style.fill = undefinedCenterFill;
+      if (el) {
+        el.style.fill = undefinedCenterFill;
+        el.style.cursor = 'pointer';
+        el.style.pointerEvents = 'all';
+      }
     });
 
-    // 2. 重置 64 閘門（保留 coveringGates 預設白色覆蓋邏輯）
+    // 2. 重置 64 閘門填色區塊（啟用點擊游標與指標事件）
     for (let i = 1; i <= 64; i++) {
       const designEl = root.querySelector<SVGElement>(`#gate-${i}-design`);
       const personalityEl = root.querySelector<SVGElement>(`#gate-${i}-personality`);
       const fillColor = COVERING_GATES.has(i) ? (theme === 'light' ? '#FFFFFF' : '#0f172a') : 'transparent';
-      if (designEl) designEl.style.fill = fillColor;
-      if (personalityEl) personalityEl.style.fill = fillColor;
+      if (designEl) {
+        designEl.style.fill = fillColor;
+        designEl.style.cursor = 'pointer';
+        designEl.style.pointerEvents = 'all';
+      }
+      if (personalityEl) {
+        personalityEl.style.fill = fillColor;
+        personalityEl.style.cursor = 'pointer';
+        personalityEl.style.pointerEvents = 'all';
+      }
     }
 
+    // 閘門定義圈圈即使未定義透明也保留全範圍點擊命中（優先於底下的中心）
     root.querySelectorAll<SVGElement>('[id^="gate-circle-"]').forEach((el) => {
       el.style.opacity = '0';
-      el.style.fill = 'transparent';
+      el.style.fill = 'rgba(0, 0, 0, 0)';
+      el.style.cursor = 'pointer';
+      el.style.pointerEvents = 'all';
     });
     root.querySelectorAll<SVGElement>('[id^="arrow-"]').forEach((el) => {
       el.style.display = 'none';
@@ -203,10 +235,57 @@ export function BodyGraph2DSvg({ className = '' }: { className?: string }) {
     });
   }, [svgMarkup, chart, viewMode, planetToggles, theme]);
 
+  const handleSvgClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    let el = e.target as Element | null;
+    while (el && el !== containerRef.current) {
+      const id = el.id || '';
+
+      // 1. 點到閘門定義圈圈（含透穿的閘門數字）或閘門填色區塊 → 跳至 3D 閘門走廊
+      const gateCircleMatch = id.match(/^gate-circle-(\d+)$/);
+      if (gateCircleMatch) {
+        e.stopPropagation();
+        const gateNum = Number(gateCircleMatch[1]);
+        setDisplayMode('universe-3d');
+        enterCorridorByGate(gateNum, 'in', 85);
+        return;
+      }
+
+      const gateFillMatch = id.match(/^gate-(\d+)-(design|personality)$/);
+      if (gateFillMatch) {
+        e.stopPropagation();
+        const gateNum = Number(gateFillMatch[1]);
+        setDisplayMode('universe-3d');
+        enterCorridorByGate(gateNum, 'in', 85);
+        return;
+      }
+
+      // 2. 點到九中心（已自然排除上層的閘門定義圈圈）→ 跳至 3D 該中心內部空間
+      const centerId = SVG_ID_TO_CENTER_ID[id];
+      if (centerId) {
+        e.stopPropagation();
+        const centerInfo = CENTERS.find((c) => c.id === centerId);
+        const cfg = useSceneConfigStore.getState().config;
+        const pos: [number, number, number] = centerInfo
+          ? [
+              centerInfo.flatPos[0] * cfg.bodyGraphScale,
+              cfg.bodyGraphFlatY + 0.55,
+              centerInfo.flatPos[1] * cfg.bodyGraphScale,
+            ]
+          : [0, cfg.bodyGraphFlatY + 0.55, 0];
+        setDisplayMode('universe-3d');
+        enterCenterInterior(centerId, pos);
+        return;
+      }
+
+      el = el.parentElement;
+    }
+  };
+
   return (
     <div
       ref={containerRef}
       className={`bodygraph-2d-svg ${className}`}
+      onClick={handleSvgClick}
       dangerouslySetInnerHTML={{ __html: svgMarkup }}
     />
   );
