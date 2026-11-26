@@ -186,8 +186,8 @@ export const useWorldStore = create<WorldState>((set, get) => ({
   interiorSpace: null,
   avatarConfig: {
     style: 'neutrino-orb',
-    primaryColor: '#38bdf8',
-    accentColor: '#fde047',
+    primaryColor: '#f5c542',
+    accentColor: '#fef08a',
     scale: 1,
   },
   cameraFocusTarget: null,

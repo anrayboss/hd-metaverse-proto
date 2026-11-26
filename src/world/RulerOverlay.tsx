@@ -1,20 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useThree } from '@react-three/fiber';
-import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { useSceneConfigStore } from '../store/useSceneConfigStore';
 
 interface HoveredBox {
-  name: string;
   center: [number, number, number];
   size: [number, number, number];
-  topY: number;
 }
 
 export function RulerOverlay() {
   const showRuler = useSceneConfigStore((s) => s.showRuler);
+  const setHoveredRuler = useSceneConfigStore((s) => s.setHoveredRuler);
   const { camera, gl, scene } = useThree();
-  const [hovered, setHovered] = useState<HoveredBox | null>(null);
+  const [boxState, setBoxState] = useState<HoveredBox | null>(null);
 
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const pointer = useMemo(() => new THREE.Vector2(), []);
@@ -25,7 +23,8 @@ export function RulerOverlay() {
 
   useEffect(() => {
     if (!showRuler) {
-      setHovered(null);
+      setBoxState(null);
+      setHoveredRuler(null);
       return;
     }
 
@@ -41,8 +40,10 @@ export function RulerOverlay() {
       let found: THREE.Object3D | null = null;
       for (const hit of intersects) {
         const obj = hit.object;
-        // 跳過尺規本身、粒子點雲、線條與完全透明碰撞盒
-        if (rulerGroupRef.current && (obj === rulerGroupRef.current || rulerGroupRef.current.children.includes(obj))) {
+        if (
+          rulerGroupRef.current &&
+          (obj === rulerGroupRef.current || rulerGroupRef.current.children.includes(obj))
+        ) {
           continue;
         }
         if (obj.userData?.ignoreRuler) continue;
@@ -57,27 +58,37 @@ export function RulerOverlay() {
       }
 
       if (!found) {
-        setHovered(null);
+        setBoxState(null);
+        setHoveredRuler(null);
         return;
       }
 
       box.setFromObject(found);
       if (box.isEmpty()) {
-        setHovered(null);
+        setBoxState(null);
+        setHoveredRuler(null);
         return;
       }
       box.getSize(sizeVec);
       box.getCenter(centerVec);
 
-      setHovered({
-        name: found.name || found.parent?.name || '3D 物件',
+      const dims: [number, number, number] = [sizeVec.x, sizeVec.y, sizeVec.z];
+      setBoxState({
         center: [centerVec.x, centerVec.y, centerVec.z],
-        size: [sizeVec.x, sizeVec.y, sizeVec.z],
-        topY: box.max.y,
+        size: dims,
+      });
+      setHoveredRuler({
+        name: found.name || found.parent?.name || '3D 物件',
+        size: dims,
+        clientX: e.clientX,
+        clientY: e.clientY,
       });
     };
 
-    const onPointerLeave = () => setHovered(null);
+    const onPointerLeave = () => {
+      setBoxState(null);
+      setHoveredRuler(null);
+    };
 
     dom.addEventListener('pointermove', onPointerMove);
     dom.addEventListener('pointerleave', onPointerLeave);
@@ -85,32 +96,16 @@ export function RulerOverlay() {
       dom.removeEventListener('pointermove', onPointerMove);
       dom.removeEventListener('pointerleave', onPointerLeave);
     };
-  }, [showRuler, camera, gl, scene, raycaster, pointer, box, sizeVec, centerVec]);
+  }, [showRuler, camera, gl, scene, raycaster, pointer, box, sizeVec, centerVec, setHoveredRuler]);
 
-  if (!showRuler || !hovered) return null;
+  if (!showRuler || !boxState) return null;
 
   return (
     <group ref={rulerGroupRef}>
-      {/* 包圍盒線框 */}
-      <mesh position={hovered.center} scale={hovered.size}>
+      <mesh position={boxState.center} scale={boxState.size}>
         <boxGeometry args={[1, 1, 1]} />
         <meshBasicMaterial color="#f59e0b" wireframe transparent opacity={0.85} />
       </mesh>
-
-      {/* 長寬高懸浮標示 */}
-      <Html
-        position={[hovered.center[0], hovered.topY + 0.65, hovered.center[2]]}
-        center
-        style={{ pointerEvents: 'none' }}
-      >
-        <div className="ruler-badge">
-          <div className="ruler-badge__name">{hovered.name}</div>
-          <div className="ruler-badge__dims">
-            長(X) {hovered.size[0].toFixed(2)}m · 高(Y) {hovered.size[1].toFixed(2)}m · 深(Z){' '}
-            {hovered.size[2].toFixed(2)}m
-          </div>
-        </div>
-      </Html>
     </group>
   );
 }

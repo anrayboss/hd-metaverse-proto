@@ -136,7 +136,7 @@ export function CameraRig() {
       default:
         return {
           desiredPos: new THREE.Vector3(0, config.birdEyeHeight, 0.1),
-          desiredTarget: new THREE.Vector3(0, 0.5, 0),
+          desiredTarget: new THREE.Vector3(0, 14, 0),
         };
     }
   }, [
@@ -396,10 +396,11 @@ export function CameraRig() {
     // 4. 外部自由探索模式（全第三人稱：繞著微中子化身飛翔）
     if (freeRoamResetTick !== prevFreeRoamTickRef.current) {
       prevFreeRoamTickRef.current = freeRoamResetTick;
-      avatarState.position.set(0, 0.5, 0);
+      // 置於中庭上方 14m，避免落入 R < 21.5 && y < 4.8 誤判進入人體圖內部空間
+      avatarState.position.set(0, 14, 0);
       freeRoamGlideRef.current = true;
     } else if (modeChanged && prevModeRef.current === 'overview') {
-      avatarState.position.set(0, 0.5, 0);
+      avatarState.position.set(0, 14, 0);
       freeRoamGlideRef.current = true;
     }
 
@@ -476,13 +477,15 @@ export function CameraRig() {
     }
     if (camera.position.y < minCamY) camera.position.y = minCamY;
 
-    // GTA 式自動進入偵測（改判化身座標）：微中子飛進中庭範圍內即無縫進入人體圖內部空間
-    const freeR = Math.hypot(avatarState.position.x, avatarState.position.z);
-    const freeY = avatarState.position.y;
-    if (freeR < 21.5 && freeY < 4.8 && freeY > -1.0) {
-      useWorldStore.getState().enterBodyGraphInteriorAuto();
-      prevModeRef.current = currentMode;
-      return;
+    // GTA 式自動進入偵測（改判化身座標；重置飛往鳥瞰期間不觸發）
+    if (!freeRoamGlideRef.current) {
+      const freeR = Math.hypot(avatarState.position.x, avatarState.position.z);
+      const freeY = avatarState.position.y;
+      if (freeR < 21.5 && freeY < 4.8 && freeY > -1.0) {
+        useWorldStore.getState().enterBodyGraphInteriorAuto();
+        prevModeRef.current = currentMode;
+        return;
+      }
     }
 
     controls.update();

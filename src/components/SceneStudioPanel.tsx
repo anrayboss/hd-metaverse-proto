@@ -5,6 +5,7 @@ import { DEFAULT_SCENE_CONFIG, useSceneConfigStore } from '../store/useSceneConf
 export function SceneStudioPanel() {
   const setConfig = useSceneConfigStore((s) => s.setConfig);
   const setShowRuler = useSceneConfigStore((s) => s.setShowRuler);
+  const hoveredRuler = useSceneConfigStore((s) => s.hoveredRuler);
   const saveToLocalFile = useSceneConfigStore((s) => s.saveToLocalFile);
   const saveStatus = useSceneConfigStore((s) => s.saveStatus);
 
@@ -98,6 +99,24 @@ export function SceneStudioPanel() {
   return (
     <>
       <Leva collapsed={false} titleBar={{ title: '🎛️ 場景調參 Studio' }} />
+      {hoveredRuler && (
+        <div
+          className="ruler-badge"
+          style={{
+            position: 'fixed',
+            left: Math.min(window.innerWidth - 260, hoveredRuler.clientX + 16),
+            top: Math.min(window.innerHeight - 64, hoveredRuler.clientY + 16),
+            pointerEvents: 'none',
+            zIndex: 9998,
+          }}
+        >
+          <div className="ruler-badge__name">{hoveredRuler.name}</div>
+          <div className="ruler-badge__dims">
+            長(X) {hoveredRuler.size[0].toFixed(2)}m · 高(Y) {hoveredRuler.size[1].toFixed(2)}m · 深(Z){' '}
+            {hoveredRuler.size[2].toFixed(2)}m
+          </div>
+        </div>
+      )}
       {saveStatus && <div className="studio-toast">{saveStatus}</div>}
     </>
   );

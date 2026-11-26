@@ -49,12 +49,21 @@ export interface SceneConfig {
   freeRoamSpeed: number;
 }
 
+export interface HoveredRulerInfo {
+  name: string;
+  size: [number, number, number];
+  clientX: number;
+  clientY: number;
+}
+
 interface SceneConfigState {
   config: SceneConfig;
   showRuler: boolean;
+  hoveredRuler: HoveredRulerInfo | null;
   saveStatus: string;
   setConfig: (partial: Partial<SceneConfig>) => void;
   setShowRuler: (show: boolean) => void;
+  setHoveredRuler: (info: HoveredRulerInfo | null) => void;
   resetConfig: () => void;
   saveToLocalFile: () => Promise<void>;
 }
@@ -64,6 +73,7 @@ export const DEFAULT_SCENE_CONFIG: SceneConfig = { ...initialConfig };
 export const useSceneConfigStore = create<SceneConfigState>((set, get) => ({
   config: { ...DEFAULT_SCENE_CONFIG },
   showRuler: false,
+  hoveredRuler: null,
   saveStatus: '',
 
   setConfig: (partial) =>
@@ -71,7 +81,9 @@ export const useSceneConfigStore = create<SceneConfigState>((set, get) => ({
       config: { ...state.config, ...partial },
     })),
 
-  setShowRuler: (showRuler) => set({ showRuler }),
+  setShowRuler: (showRuler) => set({ showRuler, hoveredRuler: showRuler ? get().hoveredRuler : null }),
+
+  setHoveredRuler: (hoveredRuler) => set({ hoveredRuler }),
 
   resetConfig: () => set({ config: { ...DEFAULT_SCENE_CONFIG }, saveStatus: '已還原初始值' }),
 
