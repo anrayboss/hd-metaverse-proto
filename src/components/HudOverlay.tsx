@@ -35,6 +35,7 @@ export function HudOverlay() {
   const chartRecords = useWorldStore((s) => s.chartRecords);
   const showChartDrawer = useWorldStore((s) => s.showChartDrawer);
   const selected = useWorldStore((s) => s.selected);
+  const interiorSpace = useWorldStore((s) => s.interiorSpace);
   const showReceiptModal = useWorldStore((s) => s.showReceiptModal);
   const activeCorridorIndex = useWorldStore((s) => s.activeCorridorIndex);
   const corridorRadius = useWorldStore((s) => s.corridorRadius);
@@ -47,6 +48,10 @@ export function HudOverlay() {
   const loadSavedRecord = useWorldStore((s) => s.loadSavedRecord);
   const setShowChartDrawer = useWorldStore((s) => s.setShowChartDrawer);
   const enterCorridorByGate = useWorldStore((s) => s.enterCorridorByGate);
+  const enterCenterInterior = useWorldStore((s) => s.enterCenterInterior);
+  const enterChannelInterior = useWorldStore((s) => s.enterChannelInterior);
+  const setChannelInteriorProgress = useWorldStore((s) => s.setChannelInteriorProgress);
+  const exitInteriorSpace = useWorldStore((s) => s.exitInteriorSpace);
   const switchAdjacentCorridor = useWorldStore((s) => s.switchAdjacentCorridor);
   const setCorridorRadius = useWorldStore((s) => s.setCorridorRadius);
   const toggleCorridorDirection = useWorldStore((s) => s.toggleCorridorDirection);
@@ -313,8 +318,53 @@ export function HudOverlay() {
         </section>
       )}
 
+      {/* 室內漫遊控制條（位於九中心或通道管線內部時顯示） */}
+      {interiorSpace && (
+        <section className="guide-panel">
+          <span className="guide-badge guide-badge--cyan">
+            {interiorSpace.type === 'center'
+              ? `中心內部空間｜${CENTERS.find((c) => c.id === interiorSpace.centerId)?.name}`
+              : `通道管線內部｜${interiorSpace.channelId} ${interiorSpace.name}`}
+          </span>
+          {interiorSpace.type === 'center' ? (
+            <p style={{ marginTop: 6 }}>
+              滑鼠拖曳可 360° 環視中心內壁，<code>W A S D / Q E</code> 可在中心內自由移動。按{' '}
+              <code>Esc</code> 退出。
+            </p>
+          ) : (
+            <>
+              <p style={{ marginTop: 6 }}>
+                <code>W / S</code> 或滑鼠滾輪沿著通道管線內部穿梭（進度{' '}
+                {Math.round(interiorSpace.progress * 100)}%）。按 <code>Esc</code> 退出。
+              </p>
+              <div className="corridor-pad" style={{ marginTop: 8 }}>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={() => setChannelInteriorProgress(interiorSpace.progress - 0.12)}
+                >
+                  ↓ 後退
+                </button>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={() => setChannelInteriorProgress(interiorSpace.progress + 0.12)}
+                >
+                  ↑ 前進
+                </button>
+              </div>
+            </>
+          )}
+          <div className="guide-actions" style={{ marginTop: 10 }}>
+            <button type="button" className="btn-primary" onClick={exitInteriorSpace}>
+              退出內部空間 (Esc)
+            </button>
+          </div>
+        </section>
+      )}
+
       {/* Stages 1 & 3 */}
-      {(stage === 'red-sun' || stage === 'bodygraph') && (
+      {!interiorSpace && (stage === 'red-sun' || stage === 'bodygraph') && (
         <section className="guide-panel">
           {stage === 'red-sun' && (
             <>
@@ -489,7 +539,7 @@ export function HudOverlay() {
             </>
           )}
 
-          {selectedCenter && (
+          {selectedCenter && selected.type === 'center' && (
             <>
               <span className="guide-badge guide-badge--cyan">
                 {chart.definedCenters.includes(selectedCenter.id) ? '已定義中心' : '空白中心'}
@@ -501,6 +551,46 @@ export function HudOverlay() {
               <div className="inspector-meta">
                 包含閘門：{selectedCenter.gates.map((g) => `#${g}`).join(' ')}
               </div>
+              <button
+                type="button"
+                className="btn-primary"
+                style={{ width: '100%', marginTop: 10 }}
+                onClick={() =>
+                  enterCenterInterior(
+                    selectedCenter.id,
+                    selected.worldPos ?? [selectedCenter.flatPos[0], 0.5, selectedCenter.flatPos[1]]
+                  )
+                }
+              >
+                🚪 進入 {selectedCenter.name} 內部空間 →
+              </button>
+            </>
+          )}
+
+          {selected.type === 'channel' && (
+            <>
+              <span className="guide-badge guide-badge--gold">
+                通道管線 · {selected.channelId}
+              </span>
+              <h3>{selected.name}</h3>
+              <div className="inspector-meta" style={{ marginBottom: 10 }}>
+                連接閘門：Gate {selected.gates[0]} ↔ Gate {selected.gates[1]}
+              </div>
+              <button
+                type="button"
+                className="btn-primary"
+                style={{ width: '100%' }}
+                onClick={() =>
+                  enterChannelInterior(
+                    selected.channelId,
+                    selected.name,
+                    selected.start,
+                    selected.end
+                  )
+                }
+              >
+                🌀 進入通道管線內部穿梭 →
+              </button>
             </>
           )}
         </aside>

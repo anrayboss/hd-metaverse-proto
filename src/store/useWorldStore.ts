@@ -34,7 +34,31 @@ export type CorridorDirection = 'in' | 'out';
 
 export type SelectedEntity =
   | { type: 'gate'; gate: GateInfo }
-  | { type: 'center'; centerId: CenterId }
+  | { type: 'center'; centerId: CenterId; worldPos?: [number, number, number] }
+  | {
+      type: 'channel';
+      channelId: string;
+      name: string;
+      gates: [number, number];
+      start: [number, number, number];
+      end: [number, number, number];
+    }
+  | null;
+
+export type InteriorSpace =
+  | {
+      type: 'center';
+      centerId: CenterId;
+      position: [number, number, number];
+    }
+  | {
+      type: 'channel';
+      channelId: string;
+      name: string;
+      start: [number, number, number];
+      end: [number, number, number];
+      progress: number; // 0..1 沿著通道軸心移動
+    }
   | null;
 
 interface WorldState {
@@ -49,6 +73,7 @@ interface WorldState {
   chartRecords: ChartRecordEntry[];
   showChartDrawer: boolean;
   selected: SelectedEntity;
+  interiorSpace: InteriorSpace;
   cameraFocusTarget: [number, number, number] | null;
   showReceiptModal: boolean;
   // 1/64 完整閘門走廊極座標狀態（R ∈ [23, 87]）
@@ -71,6 +96,22 @@ interface WorldState {
   toggleCorridorDirection: () => void;
   selectGate: (gate: GateInfo, focusPos?: [number, number, number]) => void;
   selectCenter: (centerId: CenterId, focusPos?: [number, number, number]) => void;
+  selectChannel: (
+    channelId: string,
+    name: string,
+    gates: [number, number],
+    start: [number, number, number],
+    end: [number, number, number]
+  ) => void;
+  enterCenterInterior: (centerId: CenterId, position: [number, number, number]) => void;
+  enterChannelInterior: (
+    channelId: string,
+    name: string,
+    start: [number, number, number],
+    end: [number, number, number]
+  ) => void;
+  setChannelInteriorProgress: (progress: number) => void;
+  exitInteriorSpace: () => void;
   clearSelection: () => void;
   setShowReceiptModal: (open: boolean) => void;
 }
@@ -123,6 +164,7 @@ export const useWorldStore = create<WorldState>((set, get) => ({
   chartRecords: initialRecords,
   showChartDrawer: false,
   selected: null,
+  interiorSpace: null,
   cameraFocusTarget: null,
   showReceiptModal: false,
   activeCorridorIndex: initialChart.redSun.gateInfo.wheelIndex,
@@ -140,6 +182,7 @@ export const useWorldStore = create<WorldState>((set, get) => ({
         corridorRadius: 85,
         corridorDirection: 'in',
         selected: { type: 'gate', gate: chart.redSun.gateInfo },
+        interiorSpace: null,
         cameraFocusTarget: null,
       });
       return;
@@ -151,11 +194,12 @@ export const useWorldStore = create<WorldState>((set, get) => ({
         corridorRadius: 25,
         corridorDirection: 'out',
         selected: { type: 'gate', gate: chart.blackSun.gateInfo },
+        interiorSpace: null,
         cameraFocusTarget: null,
       });
       return;
     }
-    set({ stage, cameraFocusTarget: null });
+    set({ stage, interiorSpace: null, cameraFocusTarget: null });
   },
 
   nextStage: () => {
@@ -283,9 +327,48 @@ export const useWorldStore = create<WorldState>((set, get) => ({
 
   selectCenter: (centerId, focusPos) =>
     set({
-      selected: { type: 'center', centerId },
+      selected: { type: 'center', centerId, worldPos: focusPos },
       cameraFocusTarget: focusPos ?? null,
     }),
+
+  selectChannel: (channelId, name, gates, start, end) =>
+    set({
+      selected: { type: 'channel', channelId, name, gates, start, end },
+      cameraFocusTarget: [
+        (start[0] + end[0]) / 2,
+        (start[1] + end[1]) / 2,
+        (start[2] + end[2]) / 2,
+      ],
+    }),
+
+  enterCenterInterior: (centerId, position) =>
+    set({
+      stage: 'bodygraph',
+      interiorSpace: { type: 'center', centerId, position },
+      selected: { type: 'center', centerId, worldPos: position },
+      cameraFocusTarget: null,
+    }),
+
+  enterChannelInterior: (channelId, name, start, end) =>
+    set({
+      stage: 'bodygraph',
+      interiorSpace: { type: 'channel', channelId, name, start, end, progress: 0.15 },
+      cameraFocusTarget: null,
+    }),
+
+  setChannelInteriorProgress: (progress) =>
+    set((s) =>
+      s.interiorSpace?.type === 'channel'
+        ? {
+            interiorSpace: {
+              ...s.interiorSpace,
+              progress: Math.max(0.02, Math.min(0.98, progress)),
+            },
+          }
+        : s
+    ),
+
+  exitInteriorSpace: () => set({ interiorSpace: null }),
 
   clearSelection: () => set({ selected: null, cameraFocusTarget: null }),
 

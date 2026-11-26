@@ -16,92 +16,99 @@ import { useSceneConfigStore } from '../store/useSceneConfigStore';
 const SECTOR_ANGLE = (Math.PI * 2) / 64; // 5.625°
 
 /**
- * 走廊內左右懸浮半透明填色切換箭頭
+ * 可直接點擊的隧道側牆：點擊左牆或右牆直接切換至該側鄰近閘門走廊（取代懸浮箭頭）
  */
-function CorridorSwitchArrow({
-  direction,
-  position,
-  rotationY,
-  label,
+function ClickableCorridorWall({
+  wallAngle,
+  corridorMidR,
+  corridorLength,
+  wallHeight,
+  wallOpacity,
+  corridorRadius,
+  dirSign,
+  targetGateNumber,
   isLight,
-  onClick,
+  onSwitch,
 }: {
-  direction: -1 | 1;
-  position: [number, number, number];
-  rotationY: number;
-  label: string;
+  wallAngle: number;
+  corridorMidR: number;
+  corridorLength: number;
+  wallHeight: number;
+  wallOpacity: number;
+  corridorRadius: number;
+  dirSign: number;
+  targetGateNumber: number;
   isLight: boolean;
-  onClick: () => void;
+  onSwitch: () => void;
 }) {
-  const groupRef = useRef<THREE.Group>(null);
   const [hovered, setHovered] = useState(false);
 
-  const arrowGeometry = useMemo(() => {
-    const s = new THREE.Shape();
-    const d = direction;
-    s.moveTo(0, 0.4);
-    s.lineTo(d * 0.55, 0.4);
-    s.lineTo(d * 0.55, 0.76);
-    s.lineTo(d * 1.32, 0);
-    s.lineTo(d * 0.55, -0.76);
-    s.lineTo(d * 0.55, -0.4);
-    s.lineTo(0, -0.4);
-    s.closePath();
+  // 提示文字跟著玩家視線前方附著在牆面上
+  const hintR = Math.max(
+    RING_RADII.corridorInner + 3,
+    Math.min(RING_RADII.corridorOuter - 3, corridorRadius + dirSign * 7.5)
+  );
+  const localHintX = hintR - corridorMidR;
 
-    return new THREE.ExtrudeGeometry(s, {
-      depth: 0.14,
-      bevelEnabled: true,
-      bevelThickness: 0.03,
-      bevelSize: 0.03,
-      bevelSegments: 1,
-    });
-  }, [direction]);
-
-  useFrame((state) => {
-    if (groupRef.current) {
-      groupRef.current.position.y =
-        position[1] + Math.sin(state.clock.elapsedTime * 3.2 + direction) * 0.12;
-    }
-  });
+  const baseColor = hovered ? '#f59e0b' : isLight ? '#0284c7' : '#7dd3fc';
+  const emissiveColor = hovered ? '#d97706' : '#0284c7';
 
   return (
     <group
-      ref={groupRef}
-      position={position}
-      rotation={[0, rotationY, 0]}
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick();
-      }}
-      onPointerOver={(e) => {
-        e.stopPropagation();
-        setHovered(true);
-        document.body.style.cursor = 'pointer';
-      }}
-      onPointerOut={() => {
-        setHovered(false);
-        document.body.style.cursor = 'auto';
-      }}
+      position={[
+        Math.cos(wallAngle) * corridorMidR,
+        wallHeight / 2,
+        Math.sin(wallAngle) * corridorMidR,
+      ]}
+      rotation={[0, -wallAngle, 0]}
     >
-      <mesh geometry={arrowGeometry} scale={hovered ? 1.15 : 1}>
+      <mesh
+        onClick={(e) => {
+          e.stopPropagation();
+          onSwitch();
+        }}
+        onPointerOver={(e) => {
+          e.stopPropagation();
+          setHovered(true);
+          document.body.style.cursor = 'pointer';
+        }}
+        onPointerOut={() => {
+          setHovered(false);
+          document.body.style.cursor = 'auto';
+        }}
+      >
+        <planeGeometry args={[corridorLength, wallHeight]} />
         <meshStandardMaterial
-          color={hovered ? '#f59e0b' : '#0284c7'}
-          emissive={hovered ? '#d97706' : '#0284c7'}
-          emissiveIntensity={hovered ? 1.2 : 0.55}
+          color={baseColor}
+          emissive={emissiveColor}
+          emissiveIntensity={hovered ? 0.75 : isLight ? 0.2 : 0.45}
           transparent
-          opacity={hovered ? 0.88 : 0.52}
+          opacity={hovered ? Math.min(0.42, wallOpacity + 0.18) : wallOpacity}
+          side={THREE.DoubleSide}
+          depthWrite={false}
         />
       </mesh>
-      <Billboard position={[direction * 0.65, -1.0, 0]} follow>
-        <Text
-          fontSize={0.34}
-          color={hovered ? (isLight ? '#b45309' : '#fef08a') : isLight ? '#0369a1' : '#bae6fd'}
-          outlineWidth={0.03}
-          outlineColor={isLight ? '#ffffff' : '#05070e'}
-        >
-          {label}
-        </Text>
-      </Billboard>
+      <mesh position={[0, wallHeight / 2, 0]}>
+        <boxGeometry args={[corridorLength, 0.12, 0.12]} />
+        <meshBasicMaterial
+          color={hovered ? '#f59e0b' : isLight ? '#0284c7' : '#7dd3fc'}
+          transparent
+          opacity={hovered ? 1 : 0.85}
+        />
+      </mesh>
+      {hovered && (
+        <Billboard position={[localHintX, 0.2, 0]} follow>
+          <Text
+            fontSize={0.46}
+            color={isLight ? '#b45309' : '#fef08a'}
+            outlineWidth={0.04}
+            outlineColor={isLight ? '#ffffff' : '#05070e'}
+            fontWeight={700}
+          >
+            {`點擊切換 → Gate ${targetGateNumber}`}
+          </Text>
+        </Billboard>
+      )}
     </group>
   );
 }
@@ -299,7 +306,7 @@ function CorridorStations({
 }
 
 /**
- * 64 條完整 1/64 曼陀羅閘門走廊（從 R=22 貫穿至 R=88，含物理透明牆與左右切換箭頭）
+ * 64 條完整 1/64 曼陀羅閘門走廊（從 R=22 貫穿至 R=88，直接點擊左右側牆壁切換鄰近閘門）
  */
 export function PhysiologyCorridors3D() {
   const theme = useWorldStore((s) => s.theme);
@@ -337,45 +344,10 @@ export function PhysiologyCorridors3D() {
   const prevGate = MANDALA_GATES[(activeCorridorIndex - 1 + 64) % 64];
   const nextGate = MANDALA_GATES[(activeCorridorIndex + 1) % 64];
 
-  // 兩側物理透明牆（只對當前走廊兩側強化顯示，避免鳥瞰視角被 64 面高牆遮擋）
-  const leftWallAngle = activeGate.angleRad - SECTOR_ANGLE / 2;
-  const rightWallAngle = activeGate.angleRad + SECTOR_ANGLE / 2;
-
-  // 走廊內懸浮半透明左右箭頭（依 In / Out 視角方向永遠浮在玩家前方兩側）
+  // 兩側物理透明牆（直接點擊該側牆壁即切往該側相鄰閘門）
+  const minusWallAngle = activeGate.angleRad - SECTOR_ANGLE / 2;
+  const plusWallAngle = activeGate.angleRad + SECTOR_ANGLE / 2;
   const dirSign = corridorDirection === 'in' ? -1 : 1;
-  const arrowAnchorR = Math.max(
-    RING_RADII.corridorInner + 2.5,
-    Math.min(RING_RADII.corridorOuter - 2.5, corridorRadius + dirSign * 6.0)
-  );
-  const lateralOffset = arrowAnchorR * Math.sin(SECTOR_ANGLE * 0.34);
-  const cosA = Math.cos(activeGate.angleRad);
-  const sinA = Math.sin(activeGate.angleRad);
-  // 面向 In (-cosA, -sinA) 時右向量為 (sinA, -cosA)；面向 Out 時相反
-  const rightX = corridorDirection === 'in' ? sinA : -sinA;
-  const rightZ = corridorDirection === 'in' ? -cosA : cosA;
-  const centerPosX = cosA * arrowAnchorR;
-  const centerPosZ = sinA * arrowAnchorR;
-
-  const leftArrowPos: [number, number, number] = [
-    centerPosX - rightX * lateralOffset,
-    2.4,
-    centerPosZ - rightZ * lateralOffset,
-  ];
-  const rightArrowPos: [number, number, number] = [
-    centerPosX + rightX * lateralOffset,
-    2.4,
-    centerPosZ + rightZ * lateralOffset,
-  ];
-  const arrowRotY =
-    corridorDirection === 'in'
-      ? -activeGate.angleRad + Math.PI / 2
-      : -activeGate.angleRad - Math.PI / 2;
-
-  // In 與 Out 面對方向相反，左右對應的相鄰閘門索引也隨視角直覺對齊
-  const leftStep: -1 | 1 = corridorDirection === 'in' ? -1 : 1;
-  const rightStep: -1 | 1 = corridorDirection === 'in' ? 1 : -1;
-  const leftGateLabel = leftStep === -1 ? prevGate.gate : nextGate.gate;
-  const rightGateLabel = rightStep === 1 ? nextGate.gate : prevGate.gate;
 
   return (
     <group>
@@ -422,61 +394,39 @@ export function PhysiologyCorridors3D() {
         );
       })}
 
-      {/* 進入走廊時：顯示該 1/64 空間的兩側完整物理透明牆 + 8 大立體物件站點 + 左右懸浮箭頭 */}
+      {/* 進入走廊時：兩側可點擊切換的透明牆壁 + 8 大立體物件站點 */}
       {isInCorridor && (
         <group>
-          {[leftWallAngle, rightWallAngle].map((wallAngle, idx) => (
-            <group
-              key={idx}
-              position={[
-                Math.cos(wallAngle) * corridorMidR,
-                wallHeight / 2,
-                Math.sin(wallAngle) * corridorMidR,
-              ]}
-              rotation={[0, -wallAngle, 0]}
-            >
-              <mesh>
-                <planeGeometry args={[corridorLength, wallHeight]} />
-                <meshStandardMaterial
-                  color={isLight ? '#0284c7' : '#7dd3fc'}
-                  emissive="#0284c7"
-                  emissiveIntensity={isLight ? 0.2 : 0.45}
-                  transparent
-                  opacity={config.corridorWallOpacity}
-                  side={THREE.DoubleSide}
-                  depthWrite={false}
-                />
-              </mesh>
-              <mesh position={[0, wallHeight / 2, 0]}>
-                <boxGeometry args={[corridorLength, 0.12, 0.12]} />
-                <meshBasicMaterial color={isLight ? '#0284c7' : '#7dd3fc'} transparent opacity={0.85} />
-              </mesh>
-            </group>
-          ))}
+          <ClickableCorridorWall
+            wallAngle={minusWallAngle}
+            corridorMidR={corridorMidR}
+            corridorLength={corridorLength}
+            wallHeight={wallHeight}
+            wallOpacity={config.corridorWallOpacity}
+            corridorRadius={corridorRadius}
+            dirSign={dirSign}
+            targetGateNumber={prevGate.gate}
+            isLight={isLight}
+            onSwitch={() => switchAdjacentCorridor(-1)}
+          />
+          <ClickableCorridorWall
+            wallAngle={plusWallAngle}
+            corridorMidR={corridorMidR}
+            corridorLength={corridorLength}
+            wallHeight={wallHeight}
+            wallOpacity={config.corridorWallOpacity}
+            corridorRadius={corridorRadius}
+            dirSign={dirSign}
+            targetGateNumber={nextGate.gate}
+            isLight={isLight}
+            onSwitch={() => switchAdjacentCorridor(1)}
+          />
 
           {/* 8 大立體站點（象限 → 數字 → 中心塊狀體 → 神格 → 星座 → 八卦 → 密碼子環 Token → 生理對應） */}
           <CorridorStations
             gate={activeGate}
             centerInfo={centerMap[activeGate.centerId]}
             isLight={isLight}
-          />
-
-          {/* 左右懸浮半透明箭頭切換鄰近閘門 */}
-          <CorridorSwitchArrow
-            direction={-1}
-            position={leftArrowPos}
-            rotationY={arrowRotY}
-            label={`← Gate ${leftGateLabel}`}
-            isLight={isLight}
-            onClick={() => switchAdjacentCorridor(leftStep)}
-          />
-          <CorridorSwitchArrow
-            direction={1}
-            position={rightArrowPos}
-            rotationY={arrowRotY}
-            label={`Gate ${rightGateLabel} →`}
-            isLight={isLight}
-            onClick={() => switchAdjacentCorridor(rightStep)}
           />
         </group>
       )}

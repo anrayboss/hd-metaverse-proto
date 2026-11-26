@@ -13,10 +13,12 @@ export function CameraRig() {
   const keysPressed = useRef<Record<string, boolean>>({});
   const isUserInteracting = useRef(false);
   const smoothCorridorAngle = useRef<number | null>(null);
+  const enteredCenterIdRef = useRef<string | null>(null);
 
   const stage = useWorldStore((s) => s.stage);
   const chart = useWorldStore((s) => s.chart);
   const cameraFocusTarget = useWorldStore((s) => s.cameraFocusTarget);
+  const interiorSpace = useWorldStore((s) => s.interiorSpace);
   const activeCorridorIndex = useWorldStore((s) => s.activeCorridorIndex);
   const corridorRadius = useWorldStore((s) => s.corridorRadius);
   const corridorDirection = useWorldStore((s) => s.corridorDirection);
@@ -28,6 +30,13 @@ export function CameraRig() {
       keysPressed.current[e.code] = true;
 
       const state = useWorldStore.getState();
+
+      if (e.code === 'Escape' && state.interiorSpace) {
+        e.preventDefault();
+        state.exitInteriorSpace();
+        return;
+      }
+
       const inCorridor = state.stage === 'corridor' || state.stage === 'black-sun';
       if (inCorridor) {
         const leftStep: -1 | 1 = state.corridorDirection === 'in' ? -1 : 1;
@@ -48,7 +57,12 @@ export function CameraRig() {
         }
       }
 
-      if (e.code === 'Space' && state.stage !== 'intro' && state.stage !== 'free-roam') {
+      if (
+        e.code === 'Space' &&
+        !state.interiorSpace &&
+        state.stage !== 'intro' &&
+        state.stage !== 'free-roam'
+      ) {
         e.preventDefault();
         state.nextStage();
       }
@@ -58,6 +72,11 @@ export function CameraRig() {
     };
     const onWheel = (e: WheelEvent) => {
       const state = useWorldStore.getState();
+      if (state.interiorSpace?.type === 'channel') {
+        const step = e.deltaY < 0 ? 0.045 : -0.045;
+        state.setChannelInteriorProgress(state.interiorSpace.progress + step);
+        return;
+      }
       if (state.stage === 'corridor' || state.stage === 'black-sun') {
         // 滾輪往前推（deltaY < 0）沿目前視角方向前進
         const forwardSign = state.corridorDirection === 'in' ? -1 : 1;
@@ -92,7 +111,6 @@ export function CameraRig() {
 
     switch (stage) {
       case 'intro':
-        // 正上方純粹鳥瞰視角（完全對應海報第二張圖）
         return {
           desiredPos: new THREE.Vector3(0, config.birdEyeHeight, 0.1),
           desiredTarget: new THREE.Vector3(0, 0, 0),
@@ -103,14 +121,12 @@ export function CameraRig() {
           desiredTarget: redDir.clone().multiplyScalar(82).add(new THREE.Vector3(0, 2, 0)),
         };
       case 'bodygraph':
-        // 綁定到中庭躺平的人體圖（清晰俯視九中心與通道）
         return {
           desiredPos: new THREE.Vector3(0, 36, 16),
           desiredTarget: new THREE.Vector3(0, 0.35, 0),
         };
       case 'free-roam':
       default:
-        // 鳥瞰大屋根全觀視角
         return {
           desiredPos: new THREE.Vector3(0, config.birdEyeHeight - 7, 0.1),
           desiredTarget: new THREE.Vector3(0, 0, 0),
@@ -123,11 +139,84 @@ export function CameraRig() {
   const moveDelta = useMemo(() => new THREE.Vector3(), []);
   const corridorCamPos = useMemo(() => new THREE.Vector3(), []);
   const corridorLookPos = useMemo(() => new THREE.Vector3(), []);
+  const channelStartVec = useMemo(() => new THREE.Vector3(), []);
+  const channelEndVec = useMemo(() => new THREE.Vector3(), []);
 
   useFrame((_, delta) => {
     const controls = controlsRef.current;
     if (!controls) return;
 
+    // 1. 進入「通道管線內部空間」：沿管線軸心前後穿梭
+    if (interiorSpace?.type === 'channel') {
+      enteredCenterIdRef.current = null;
+      const keys = keysPressed.current;
+      let nextP = interiorSpace.progress;
+      const travelSpeed = 0.28 * delta;
+      if (keys['KeyW'] || keys['ArrowUp']) nextP += travelSpeed;
+      if (keys['KeyS'] || keys['ArrowDown']) nextP -= travelSpeed;
+      if (nextP !== interiorSpace.progress) {
+        useWorldStore.getState().setChannelInteriorProgress(nextP);
+      }
+
+      channelStartVec.set(...interiorSpace.start);
+      channelEndVec.set(...interiorSpace.end);
+      corridorCamPos.lerpVectors(channelStartVec, channelEndVec, interiorSpace.progress);
+      corridorLookPos.lerpVectors(
+        channelStartVec,
+        channelEndVec,
+        Math.min(1, interiorSpace.progress + 0.16)
+      );
+
+      const lerpAlpha = 1 - Math.exp(-delta * 7.5);
+      camera.position.lerp(corridorCamPos, lerpAlpha);
+      controls.target.lerp(corridorLookPos, lerpAlpha);
+      controls.update();
+      return;
+    }
+
+    // 2. 進入「九中心內部空間」：飛進中心正中央，可 360° 環視 + WASD/QE 在室內自由漫遊
+    if (interiorSpace?.type === 'center') {
+      const centerKey = interiorSpace.centerId;
+      if (enteredCenterIdRef.current !== centerKey) {
+        const cPos = new THREE.Vector3(...interiorSpace.position);
+        const initCam = cPos.clone().add(new THREE.Vector3(0, 0.08, 0.22));
+        const initTarget = cPos.clone().add(new THREE.Vector3(0, 0.08, -0.35));
+        const lerpAlpha = 1 - Math.exp(-delta * 5.5);
+        camera.position.lerp(initCam, lerpAlpha);
+        controls.target.lerp(initTarget, lerpAlpha);
+        if (camera.position.distanceTo(initCam) < 0.06) {
+          enteredCenterIdRef.current = centerKey;
+        }
+        controls.update();
+        return;
+      }
+
+      // 進入室內後開放精細 WASD/QE 漫遊（速度調慢方便在中心內穿梭）
+      const keys = keysPressed.current;
+      const speed = (keys['ShiftLeft'] || keys['ShiftRight'] ? 6 : 2.8) * delta;
+      moveDelta.set(0, 0, 0);
+      camera.getWorldDirection(forward);
+      forward.normalize();
+      right.crossVectors(forward, camera.up).normalize();
+
+      if (keys['KeyW'] || keys['ArrowUp']) moveDelta.addScaledVector(forward, speed);
+      if (keys['KeyS'] || keys['ArrowDown']) moveDelta.addScaledVector(forward, -speed);
+      if (keys['KeyD'] || keys['ArrowRight']) moveDelta.addScaledVector(right, speed);
+      if (keys['KeyA'] || keys['ArrowLeft']) moveDelta.addScaledVector(right, -speed);
+      if (keys['KeyE']) moveDelta.y += speed;
+      if (keys['KeyQ']) moveDelta.y -= speed;
+
+      if (moveDelta.lengthSq() > 0) {
+        camera.position.add(moveDelta);
+        controls.target.add(moveDelta);
+      }
+      controls.update();
+      return;
+    }
+
+    enteredCenterIdRef.current = null;
+
+    // 3. 1/64 曼陀羅閘門走廊模式
     const inCorridor = stage === 'corridor' || stage === 'black-sun';
 
     if (inCorridor) {
@@ -152,10 +241,12 @@ export function CameraRig() {
       }
 
       const a = smoothCorridorAngle.current;
-      corridorCamPos.set(Math.cos(a) * corridorRadius, config.corridorCameraY, Math.sin(a) * corridorRadius);
+      corridorCamPos.set(
+        Math.cos(a) * corridorRadius,
+        config.corridorCameraY,
+        Math.sin(a) * corridorRadius
+      );
 
-      // In：朝內依序看 象限→數字→中心→神格→星座→八卦→密碼子→生理→人體圖
-      // Out：朝外完全相反順序呈現
       const lookR =
         corridorDirection === 'in'
           ? Math.max(0, corridorRadius - 18)
@@ -213,16 +304,23 @@ export function CameraRig() {
   });
 
   const inCorridor = stage === 'corridor' || stage === 'black-sun';
+  const inChannelInterior = interiorSpace?.type === 'channel';
+  const inCenterInterior = interiorSpace?.type === 'center';
 
   return (
     <OrbitControls
       ref={controlsRef}
       enableDamping
       dampingFactor={0.07}
-      enableRotate={!inCorridor}
-      enablePan={stage === 'free-roam'}
-      enableZoom={stage === 'free-roam' || stage === 'bodygraph' || stage === 'intro'}
-      minDistance={6}
+      enableRotate={!inCorridor && !inChannelInterior}
+      enablePan={stage === 'free-roam' || inCenterInterior}
+      enableZoom={
+        stage === 'free-roam' ||
+        stage === 'bodygraph' ||
+        stage === 'intro' ||
+        inCenterInterior
+      }
+      minDistance={0.15}
       maxDistance={290}
       onStart={() => {
         isUserInteracting.current = true;
