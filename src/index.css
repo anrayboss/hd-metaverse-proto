@@ -1512,7 +1512,7 @@ body,
 }
 
 
-/* 調參面板 (Leva fill 容器) 固定於左上角「人類設計宇宙」標題正下方 */
+/* 調參面板與獨立調色盤 (Adobe 風格垂直堆疊，固定於左上角「人類設計宇宙」標題正下方) */
 .studio-leva-dock {
   position: fixed;
   top: 78px;
@@ -1520,6 +1520,9 @@ body,
   width: 280px;
   max-height: calc(100vh - 150px);
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   z-index: 90;
   pointer-events: auto;
 }

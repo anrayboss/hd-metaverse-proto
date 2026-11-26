@@ -70,14 +70,9 @@ function CenterMiniMarker({
   customGeometry?: THREE.BufferGeometry;
 }) {
   if (customGeometry) {
-    // 直接使用 bodygraph.glb 裡的真實中心模型（已置中並正規化大小）
+    // 直接水平平移 bodygraph.glb 裡的原始中心模型，完全保留你畫的姿態與朝向
     return (
-      <mesh
-        geometry={customGeometry}
-        position={position}
-        rotation={[0, -angleRad - Math.PI / 2, 0]}
-        scale={scale}
-      >
+      <mesh geometry={customGeometry} position={position} scale={scale}>
         <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.28} />
       </mesh>
     );
@@ -371,7 +366,7 @@ export function MandalaRing3D() {
       const cid = CENTER_NAME_TO_ID[mesh.name.toLowerCase()];
       if (!cid || map[cid]) return;
       const geom = mesh.geometry.clone();
-      // 先套用該物件在 GLB 中的真實世界旋轉（不含位移與縮放），保留躺平人體圖的正確朝上平面
+      // 只套用該物件在 GLB 中的真實世界旋轉（不含額外翻轉），直接水平平移擺上中心圈
       rotMat.extractRotation(mesh.matrixWorld);
       geom.applyMatrix4(rotMat);
       geom.computeBoundingBox();
@@ -380,18 +375,6 @@ export function MandalaRing3D() {
         const center = new THREE.Vector3();
         geom.boundingBox.getSize(size);
         geom.boundingBox.getCenter(center);
-        // 若最薄的軸不是 Y（代表原本直立），額外轉 90° 使三角形正面朝向天空 +Y
-        if (size.z < size.y && size.z <= size.x) {
-          geom.rotateX(-Math.PI / 2);
-          geom.computeBoundingBox();
-          geom.boundingBox.getSize(size);
-          geom.boundingBox.getCenter(center);
-        } else if (size.x < size.y && size.x <= size.z) {
-          geom.rotateZ(Math.PI / 2);
-          geom.computeBoundingBox();
-          geom.boundingBox.getSize(size);
-          geom.boundingBox.getCenter(center);
-        }
         geom.translate(-center.x, -center.y, -center.z);
         const maxDim = Math.max(size.x, size.y, size.z, 0.001);
         const normScale = 2.1 / maxDim;
