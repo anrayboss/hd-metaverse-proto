@@ -60,6 +60,7 @@ export interface VariableArrow {
   isLeft: boolean; // Tone <= 3 為左箭頭，Tone >= 4 為右箭頭
   color: number;
   tone: number;
+  base: number;
 }
 
 export interface GateActivationStatus {
@@ -438,6 +439,7 @@ export function analyzeBodygraph(
       isLeft: dSun.tone <= 3,
       color: dSun.color,
       tone: dSun.tone,
+      base: dSun.base,
     },
     {
       position: 'tr',
@@ -446,6 +448,7 @@ export function analyzeBodygraph(
       isLeft: pSun.tone <= 3,
       color: pSun.color,
       tone: pSun.tone,
+      base: pSun.base,
     },
     {
       position: 'bl',
@@ -454,6 +457,7 @@ export function analyzeBodygraph(
       isLeft: dNode.tone <= 3,
       color: dNode.color,
       tone: dNode.tone,
+      base: dNode.base,
     },
     {
       position: 'br',
@@ -462,6 +466,7 @@ export function analyzeBodygraph(
       isLeft: pNode.tone <= 3,
       color: pNode.color,
       tone: pNode.tone,
+      base: pNode.base,
     },
   ];
 

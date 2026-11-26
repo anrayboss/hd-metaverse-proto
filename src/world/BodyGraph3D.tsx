@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useMemo, useRef } from 'react';
 import { ThreeEvent, useFrame } from '@react-three/fiber';
-import { Line, useGLTF } from '@react-three/drei';
+import { Line, Text, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import {
   CENTERS,
@@ -10,7 +10,8 @@ import {
   CenterInfo,
   GATE_BY_NUMBER,
 } from '../data/mandalaData';
-import { useWorldStore } from '../store/useWorldStore';
+import { VariableArrow, ViewMode } from '../engine/hdCalculator';
+import { useWorldStore, VariableDetailLevel } from '../store/useWorldStore';
 import { useSceneConfigStore } from '../store/useSceneConfigStore';
 
 const BODYGRAPH_GLB_URL = '/models/bodygraph.glb';
@@ -218,6 +219,139 @@ function ChannelConduit({
 }
 
 /**
+ * 3D 人體圖四箭頭（Variables）：對齊 2D 本命圖位置（頭頂與邏輯中心兩側），
+ * 依 variableDetailLevel 即時切換 純箭頭 ↔ CT ↔ CTB（Base 置於 Tone 下方），
+ * 並同步 viewMode 與南北交點開關（隱藏南北交點時連動隱藏環境 bl 與視角 br）。
+ */
+function VariableArrows3D({
+  variables,
+  headPos,
+  ajnaPos,
+  viewMode,
+  variableDetailLevel,
+  showNodes,
+  isLight,
+}: {
+  variables: VariableArrow[];
+  headPos?: THREE.Vector3;
+  ajnaPos?: THREE.Vector3;
+  viewMode: ViewMode;
+  variableDetailLevel: VariableDetailLevel;
+  showNodes: boolean;
+  isLight: boolean;
+}) {
+  const config = useSceneConfigStore((s) => s.config);
+
+  const arrowGeo = useMemo(() => {
+    const shape = new THREE.Shape();
+    // 朝 +X 的俐落箭頭造型（左箭頭以繞 Z 旋轉 180° 翻轉）
+    shape.moveTo(-1.05, 0.22);
+    shape.lineTo(0.2, 0.22);
+    shape.lineTo(0.2, 0.62);
+    shape.lineTo(1.12, 0);
+    shape.lineTo(0.2, -0.62);
+    shape.lineTo(0.2, -0.22);
+    shape.lineTo(-1.05, -0.22);
+    shape.closePath();
+    return new THREE.ExtrudeGeometry(shape, {
+      depth: 0.14,
+      bevelEnabled: false,
+    });
+  }, []);
+
+  useEffect(() => () => arrowGeo.dispose(), [arrowGeo]);
+
+  const topZ = headPos ? headPos.z : -12.6;
+  const rawBotZ = ajnaPos ? ajnaPos.z : -8.7;
+  const botZ = Math.abs(rawBotZ - topZ) < 3.6 ? topZ + 3.6 : rawBotZ;
+  const yArrow = 0.22;
+  const yText = 0.38;
+
+  const designColor = config.colorDesign;
+  const personalityColor = isLight ? config.colorPersonality : '#e2e8f0';
+
+  return (
+    <group name="VariableArrows3D">
+      {variables.map((v) => {
+        const isNodeArrow = v.position === 'bl' || v.position === 'br';
+        const sideVisible =
+          viewMode === 1 ||
+          (viewMode === 0 && v.side === 'design') ||
+          (viewMode === 2 && v.side === 'personality');
+        const visible = sideVisible && (!isNodeArrow || showNodes);
+        if (!visible) return null;
+
+        const isLeftSide = v.position === 'tl' || v.position === 'bl';
+        const rowZ = v.position === 'tl' || v.position === 'tr' ? topZ : botZ;
+        // 左側：箭頭在左 (-7.5)、CTB 文字在右 (-5.2)；右側：箭頭在左 (+5.5)、CTB 文字在右 (+7.8)，完全對齊 2D SVG
+        const arrowX = isLeftSide ? -7.5 : 5.5;
+        const textX = isLeftSide ? -5.85 : 7.15;
+        const color = v.side === 'design' ? designColor : personalityColor;
+
+        return (
+          <group key={v.position} name={`VariableArrow_${v.position}`}>
+            <mesh
+              geometry={arrowGeo}
+              position={[arrowX, yArrow, rowZ]}
+              rotation={[-Math.PI / 2, 0, v.isLeft ? Math.PI : 0]}
+            >
+              <meshStandardMaterial
+                color={color}
+                emissive={color}
+                emissiveIntensity={isLight ? 0.15 : 0.45}
+                roughness={0.4}
+                metalness={0.15}
+              />
+            </mesh>
+
+            {variableDetailLevel >= 1 && (
+              <>
+                <Text
+                  position={[textX, yText, rowZ - 0.68]}
+                  rotation={[-Math.PI / 2, 0, 0]}
+                  fontSize={0.78}
+                  color={color}
+                  anchorX="left"
+                  anchorY="middle"
+                  fontWeight={700}
+                >
+                  {`C${v.color}`}
+                </Text>
+                <Text
+                  position={[textX, yText, rowZ + 0.18]}
+                  rotation={[-Math.PI / 2, 0, 0]}
+                  fontSize={0.78}
+                  color={color}
+                  anchorX="left"
+                  anchorY="middle"
+                  fontWeight={700}
+                >
+                  {`T${v.tone}`}
+                </Text>
+              </>
+            )}
+
+            {variableDetailLevel >= 2 && (
+              <Text
+                position={[textX, yText, rowZ + 1.04]}
+                rotation={[-Math.PI / 2, 0, 0]}
+                fontSize={0.74}
+                color={color}
+                anchorX="left"
+                anchorY="middle"
+                fontWeight={700}
+              >
+                {`B${v.base}`}
+              </Text>
+            )}
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+/**
  * 讀取 Spline 匯出的 bodygraph.glb：
  * 1. 自動置中與等比縮放至中庭圓盤
  * 2. 依 Center_* 名稱套色與點擊事件
@@ -226,6 +360,10 @@ function ChannelConduit({
 function SplineAtriumBodyGraph({
   definedCenters,
   activeGates,
+  variables,
+  viewMode,
+  variableDetailLevel,
+  showNodes,
   isLight,
   yOffset,
   isInInterior,
@@ -236,6 +374,10 @@ function SplineAtriumBodyGraph({
 }: {
   definedCenters: CenterId[];
   activeGates: number[];
+  variables: VariableArrow[];
+  viewMode: ViewMode;
+  variableDetailLevel: VariableDetailLevel;
+  showNodes: boolean;
   isLight: boolean;
   yOffset: number;
   isInInterior: boolean;
@@ -614,6 +756,19 @@ function SplineAtriumBodyGraph({
           </mesh>
         </group>
       ))}
+
+      {/* 3D 曼陀羅四箭頭（Variables）：位置對齊 2D 本命圖（頭頂與邏輯中心兩側） */}
+      {variables.length > 0 && (
+        <VariableArrows3D
+          variables={variables}
+          headPos={centerPositions.head}
+          ajnaPos={centerPositions.ajna}
+          viewMode={viewMode}
+          variableDetailLevel={variableDetailLevel}
+          showNodes={showNodes}
+          isLight={isLight}
+        />
+      )}
     </group>
   );
 }
@@ -754,6 +909,9 @@ export function BodyGraph3D() {
   const config = useSceneConfigStore((s) => s.config);
   const isLight = theme === 'light';
   const chart = useWorldStore((s) => s.chart);
+  const viewMode = useWorldStore((s) => s.viewMode);
+  const variableDetailLevel = useWorldStore((s) => s.variableDetailLevel);
+  const planetToggles = useWorldStore((s) => s.planetToggles);
   const selected = useWorldStore((s) => s.selected);
   const interiorSpace = useWorldStore((s) => s.interiorSpace);
   const selectCenter = useWorldStore((s) => s.selectCenter);
@@ -781,6 +939,10 @@ export function BodyGraph3D() {
           <SplineAtriumBodyGraph
             definedCenters={chart.definedCenters}
             activeGates={chart.activeGates}
+            variables={chart.derived?.variables ?? []}
+            viewMode={viewMode}
+            variableDetailLevel={variableDetailLevel}
+            showNodes={planetToggles.nodes}
             isLight={isLight}
             yOffset={config.bodyGraphFlatY}
             isInInterior={interiorSpace !== null}

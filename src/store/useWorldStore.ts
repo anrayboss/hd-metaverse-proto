@@ -24,6 +24,9 @@ export type ThemeMode = 'light' | 'dark';
 
 export type DisplayMode = 'bodygraph-2d' | 'mandala-2d' | 'universe-3d';
 
+/** 四箭頭數值顯示層級：0 = 純箭頭、1 = 箭頭+CT、2 = 箭頭+CTB */
+export type VariableDetailLevel = 0 | 1 | 2;
+
 /** 日後製作完整新手導覽（紅太陽進 → 走廊 → 人體圖 → 黑太陽出）時改為 true */
 export const ENABLE_SUN_GUIDE = false;
 
@@ -86,6 +89,7 @@ interface WorldState {
   stage: JourneyStage;
   chart: ChartData;
   viewMode: ViewMode;
+  variableDetailLevel: VariableDetailLevel;
   planetToggles: PlanetToggles;
   isCalculatingChart: boolean;
   chartError: string | null;
@@ -111,6 +115,8 @@ interface WorldState {
   generateFullChart: (input: BirthInput, saveRecord?: boolean) => Promise<ChartData | null>;
   loadSavedRecord: (recordId: string) => void;
   setViewMode: (mode: ViewMode) => void;
+  setVariableDetailLevel: (level: VariableDetailLevel) => void;
+  stepVariableDetailLevel: (delta: -1 | 1) => void;
   togglePlanet: (key: keyof PlanetToggles) => void;
   setShowChartDrawer: (open: boolean) => void;
   enterCorridorByGate: (gateNumber: number, dir?: CorridorDirection, startRadius?: number) => void;
@@ -184,6 +190,7 @@ export const useWorldStore = create<WorldState>((set, get) => ({
   stage: 'intro',
   chart: initialChart,
   viewMode: 1,
+  variableDetailLevel: 2,
   planetToggles: DEFAULT_TOGGLES,
   isCalculatingChart: false,
   chartError: null,
@@ -323,6 +330,13 @@ export const useWorldStore = create<WorldState>((set, get) => ({
     const updated = recomputeDerivedOnChart(chart, mode, planetToggles);
     set({ viewMode: mode, chart: updated });
   },
+
+  setVariableDetailLevel: (level) => set({ variableDetailLevel: level }),
+
+  stepVariableDetailLevel: (delta) =>
+    set((s) => ({
+      variableDetailLevel: Math.max(0, Math.min(2, s.variableDetailLevel + delta)) as VariableDetailLevel,
+    })),
 
   togglePlanet: (key) => {
     const { chart, viewMode, planetToggles } = get();

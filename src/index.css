@@ -1001,6 +1001,66 @@ body,
   color: #fde68a;
 }
 
+.hd-variables-section {
+  cursor: ns-resize;
+}
+
+.hd-var-header {
+  justify-content: space-between;
+}
+
+.hd-var-hint {
+  font-size: 10.5px;
+  font-weight: 500;
+  opacity: 0.65;
+}
+
+.hd-var-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.hd-var-slider {
+  width: 100%;
+  height: 18px;
+  margin: 0;
+  accent-color: #f2ba79;
+  cursor: pointer;
+  touch-action: pan-x;
+}
+
+.hd-var-ticks {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+.hd-var-tick {
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(148, 163, 184, 0.08);
+  color: inherit;
+  border-radius: 6px;
+  padding: 3px 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.hd-var-tick--active {
+  background: rgba(242, 186, 121, 0.24);
+  border-color: rgba(242, 186, 121, 0.7);
+  color: #f2ba79;
+}
+
+[data-theme='light'] .hd-var-tick--active {
+  background: rgba(242, 186, 121, 0.3);
+  border-color: rgba(217, 140, 50, 0.7);
+  color: #92400e;
+}
+
 .hd-variables-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1017,6 +1077,26 @@ body,
   font-size: 11.5px;
   font-weight: 600;
   border: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+.hd-var-ctb {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+
+.hd-var-tb-stack {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.15;
+}
+
+.hd-var-base {
+  font-size: 10.5px;
+  opacity: 0.88;
 }
 
 .hd-var-chip--design {
