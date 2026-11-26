@@ -32,6 +32,15 @@ export type JourneyStage =
 
 export type CorridorDirection = 'in' | 'out';
 
+export type AvatarStyle = 'neutrino-orb' | 'crystal-sprite';
+
+export interface AvatarConfig {
+  style: AvatarStyle;
+  primaryColor: string;
+  accentColor: string;
+  scale: number;
+}
+
 export type SelectedEntity =
   | { type: 'gate'; gate: GateInfo }
   | { type: 'center'; centerId: CenterId; worldPos?: [number, number, number] }
@@ -79,6 +88,7 @@ interface WorldState {
   showChartDrawer: boolean;
   selected: SelectedEntity;
   interiorSpace: InteriorSpace;
+  avatarConfig: AvatarConfig;
   cameraFocusTarget: [number, number, number] | null;
   showReceiptModal: boolean;
   // 1/64 完整閘門走廊極座標狀態（R ∈ [23, 87]）
@@ -119,6 +129,7 @@ interface WorldState {
   ) => void;
   setChannelInteriorProgress: (progress: number) => void;
   exitInteriorSpace: () => void;
+  setAvatarConfig: (partial: Partial<AvatarConfig>) => void;
   clearSelection: () => void;
   setShowReceiptModal: (open: boolean) => void;
 }
@@ -172,6 +183,12 @@ export const useWorldStore = create<WorldState>((set, get) => ({
   showChartDrawer: false,
   selected: null,
   interiorSpace: null,
+  avatarConfig: {
+    style: 'neutrino-orb',
+    primaryColor: '#38bdf8',
+    accentColor: '#fde047',
+    scale: 1,
+  },
   cameraFocusTarget: null,
   showReceiptModal: false,
   activeCorridorIndex: initialChart.redSun.gateInfo.wheelIndex,
@@ -388,6 +405,11 @@ export const useWorldStore = create<WorldState>((set, get) => ({
     ),
 
   exitInteriorSpace: () => set({ interiorSpace: null }),
+
+  setAvatarConfig: (partial) =>
+    set((s) => ({
+      avatarConfig: { ...s.avatarConfig, ...partial },
+    })),
 
   clearSelection: () => set({ selected: null, cameraFocusTarget: null }),
 

@@ -4,6 +4,7 @@ import { MandalaRing3D } from './MandalaRing3D';
 import { PhysiologyCorridors3D } from './PhysiologyCorridors3D';
 import { BodyGraph3D } from './BodyGraph3D';
 import { CameraRig } from './CameraRig';
+import { PlayerAvatar } from './PlayerAvatar';
 import { useWorldStore } from '../store/useWorldStore';
 import { useSceneConfigStore } from '../store/useSceneConfigStore';
 
@@ -41,6 +42,7 @@ export function UniverseScene() {
         <MandalaRing3D />
         <PhysiologyCorridors3D />
         <BodyGraph3D />
+        <PlayerAvatar />
         <CameraRig />
       </Canvas>
     </div>
