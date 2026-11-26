@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { CENTERS, MANDALA_GATES, QUADRANT_META, RING_RADII } from '../data/mandalaData';
 import { CITY_OPTIONS, DEFAULT_CITY } from '../data/cities';
-import { ENABLE_SUN_GUIDE, JourneyStage, useWorldStore } from '../store/useWorldStore';
+import { DisplayMode, ENABLE_SUN_GUIDE, JourneyStage, useWorldStore } from '../store/useWorldStore';
 import { ChartResultPanel } from './ChartResultPanel';
 import { InfoModal, InfoModalRequest } from './InfoModal';
 
@@ -32,6 +32,8 @@ const STATIONS_IN = [
 export function HudOverlay() {
   const theme = useWorldStore((s) => s.theme);
   const toggleTheme = useWorldStore((s) => s.toggleTheme);
+  const displayMode = useWorldStore((s) => s.displayMode);
+  const setDisplayMode = useWorldStore((s) => s.setDisplayMode);
   const stage = useWorldStore((s) => s.stage);
   const chart = useWorldStore((s) => s.chart);
   const isCalculatingChart = useWorldStore((s) => s.isCalculatingChart);
@@ -129,18 +131,41 @@ export function HudOverlay() {
           </div>
         </div>
 
-        <nav className="stage-pills">
-          {STAGE_STEPS.map((s) => (
+        <div className="display-mode-switch" role="tablist" aria-label="圖表檢視模式">
+          {(
+            [
+              { id: 'bodygraph-2d', label: '2D 本命圖' },
+              { id: 'mandala-2d', label: '2D 基礎曼陀羅' },
+              { id: 'universe-3d', label: '3D 元宇宙' },
+            ] as Array<{ id: DisplayMode; label: string }>
+          ).map((m) => (
             <button
-              key={s.id}
+              key={m.id}
               type="button"
-              className={`stage-pill ${stage === s.id ? 'stage-pill--active' : ''}`}
-              onClick={() => setStage(s.id)}
+              role="tab"
+              aria-selected={displayMode === m.id}
+              className={`stage-pill ${displayMode === m.id ? 'stage-pill--active' : ''}`}
+              onClick={() => setDisplayMode(m.id)}
             >
-              {s.label}
+              {m.label}
             </button>
           ))}
-        </nav>
+        </div>
+
+        {displayMode === 'universe-3d' && (
+          <nav className="stage-pills">
+            {STAGE_STEPS.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                className={`stage-pill ${stage === s.id ? 'stage-pill--active' : ''}`}
+                onClick={() => setStage(s.id)}
+              >
+                {s.label}
+              </button>
+            ))}
+          </nav>
+        )}
 
         <div className="header-actions">
           <button
@@ -163,8 +188,8 @@ export function HudOverlay() {
         </div>
       </header>
 
-      {/* Stage 0：鳥瞰出生入口 */}
-      {stage === 'intro' && (
+      {/* Stage 0：鳥瞰出生入口（僅在 3D 模式或點再跑一張切回 intro 時顯示） */}
+      {displayMode === 'universe-3d' && stage === 'intro' && (
         <section className="intro-card" style={{ alignSelf: 'flex-start', margin: 'auto 0 0 0' }}>
           <h1>把自主權還給你</h1>
           <p className="intro-card__desc">
@@ -322,7 +347,7 @@ export function HudOverlay() {
       )}
 
       {/* 人體圖內部自由漫遊提示條（九中心與通道連通空間） */}
-      {interiorSpace && (
+      {displayMode === 'universe-3d' && interiorSpace && (
         <section className="guide-panel">
           <span className="guide-badge guide-badge--cyan">
             人體圖內部自由漫遊｜
@@ -347,7 +372,7 @@ export function HudOverlay() {
       )}
 
       {/* Stages 1 & 3 */}
-      {!interiorSpace && (stage === 'red-sun' || stage === 'bodygraph') && (
+      {displayMode === 'universe-3d' && !interiorSpace && (stage === 'red-sun' || stage === 'bodygraph') && (
         <section className="guide-panel">
           {stage === 'red-sun' && (
             <>
@@ -381,7 +406,7 @@ export function HudOverlay() {
       )}
 
       {/* Stages 2 & 4：完整 1/64 閘門走廊（In / Out 雙向） */}
-      {inCorridor && (
+      {displayMode === 'universe-3d' && inCorridor && (
         <section className="guide-panel">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span className="guide-badge guide-badge--cyan">
@@ -454,7 +479,7 @@ export function HudOverlay() {
         </section>
       )}
 
-      {stage === 'free-roam' && (
+      {displayMode === 'universe-3d' && stage === 'free-roam' && (
         <div className="controls-hint">
           <span>
             <strong>鳥瞰自由探索</strong>｜點擊任一<strong>卦象或 1/64 扇形空間</strong>即進入該閘門走廊
@@ -471,13 +496,14 @@ export function HudOverlay() {
           onOpenInfo={(req) => setInfoModal(req)}
           onNewChart={() => {
             setShowChartDrawer(false);
+            setDisplayMode('universe-3d');
             setStage('intro');
           }}
         />
       )}
 
-      {/* 閘門／中心檢視卡（進入人體圖內部空間後不顯示預覽卡） */}
-      {selected && !showChartDrawer && !interiorSpace && (
+      {/* 閘門／中心檢視卡（進入人體圖內部空間或 2D 模式後不顯示 3D 預覽卡） */}
+      {displayMode === 'universe-3d' && selected && !showChartDrawer && !interiorSpace && (
         <aside className="inspector-card">
           <button type="button" className="inspector-close" onClick={clearSelection}>
             ✕

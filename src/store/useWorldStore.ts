@@ -22,6 +22,8 @@ import { DEFAULT_CITY } from '../data/cities';
 
 export type ThemeMode = 'light' | 'dark';
 
+export type DisplayMode = 'bodygraph-2d' | 'mandala-2d' | 'universe-3d';
+
 /** 日後製作完整新手導覽（紅太陽進 → 走廊 → 人體圖 → 黑太陽出）時改為 true */
 export const ENABLE_SUN_GUIDE = false;
 
@@ -80,6 +82,7 @@ export type InteriorSpace =
 
 interface WorldState {
   theme: ThemeMode;
+  displayMode: DisplayMode;
   stage: JourneyStage;
   chart: ChartData;
   viewMode: ViewMode;
@@ -100,6 +103,7 @@ interface WorldState {
   corridorRadius: number;
   corridorDirection: CorridorDirection;
   toggleTheme: () => void;
+  setDisplayMode: (mode: DisplayMode) => void;
   setStage: (stage: JourneyStage) => void;
   nextStage: () => void;
   prevStage: () => void;
@@ -176,6 +180,7 @@ function recomputeDerivedOnChart(
 
 export const useWorldStore = create<WorldState>((set, get) => ({
   theme: 'light',
+  displayMode: 'universe-3d',
   stage: 'intro',
   chart: initialChart,
   viewMode: 1,
@@ -201,6 +206,12 @@ export const useWorldStore = create<WorldState>((set, get) => ({
   corridorDirection: 'in',
 
   toggleTheme: () => set((s) => ({ theme: s.theme === 'light' ? 'dark' : 'light' })),
+
+  setDisplayMode: (displayMode) =>
+    set((s) => ({
+      displayMode,
+      showChartDrawer: displayMode === 'universe-3d' ? s.showChartDrawer : true,
+    })),
 
   setStage: (stage) => {
     const { chart } = get();

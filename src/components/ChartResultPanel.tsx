@@ -320,12 +320,14 @@ export function ChartResultPanel({
             </div>
           </div>
 
-          {/* 四箭頭 Variables */}
+          {/* 四箭頭 Variables（隱藏南北交點時，連動隱藏 bl 環境與 br 視角） */}
           <div className="hd-variables-grid">
             {derived.variables.map((v) => {
-              const visible =
+              const isNodeArrow = v.position === 'bl' || v.position === 'br';
+              const sideVisible =
                 (v.side === 'design' && showDesignSide) ||
                 (v.side === 'personality' && showPersonalitySide);
+              const visible = sideVisible && (!isNodeArrow || planetToggles.nodes);
               return (
                 <div
                   key={v.position}
