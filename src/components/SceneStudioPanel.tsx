@@ -10,6 +10,7 @@ export function SceneStudioPanel() {
   const saveStatus = useSceneConfigStore((s) => s.saveStatus);
 
   const [values, set] = useControls('3D 場景即時調參', () => ({
+    showRuler: { value: false, label: '📏 顯示尺規 (懸停長寬高)' },
     '地板與曼陀羅': folder(
       {
         floorY: { value: DEFAULT_SCENE_CONFIG.floorY, min: -4, max: 2, step: 0.05, label: '地板高度 Y' },
@@ -84,7 +85,6 @@ export function SceneStudioPanel() {
         bodyGraphCamY: { value: DEFAULT_SCENE_CONFIG.bodyGraphCamY, min: 10, max: 90, step: 1, label: '人體圖鏡頭 Y' },
         bodyGraphCamZ: { value: DEFAULT_SCENE_CONFIG.bodyGraphCamZ, min: 0.1, max: 60, step: 1, label: '人體圖鏡頭 Z' },
         freeRoamSpeed: { value: DEFAULT_SCENE_CONFIG.freeRoamSpeed, min: 8, max: 80, step: 2, label: '自由漫遊速度' },
-        showRuler: { value: false, label: '📏 顯示尺規 (懸停長寬高)' },
       },
       { collapsed: true }
     ),

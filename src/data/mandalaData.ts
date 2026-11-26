@@ -56,19 +56,19 @@ export interface CodonRingInfo {
 
 export const RING_RADII = {
   atriumMax: 22,
-  physiology: 30,
-  codonToken: 38,
-  trigram: 45,
-  zodiac: 52,
-  godhead: 59,
-  centerBlock: 66,
-  gateNumber: 73,
-  quadrant: 80,
-  hexagram: 88,
-  base: 95,
+  physiology: 28.5,
+  codonToken: 36.65,
+  trigram: 42.3,
+  zodiac: 51.3,
+  godhead: 60.3,
+  centerBlock: 69.3,
+  gateNumber: 76.3,
+  quadrant: 85.3,
+  hexagram: 95.8,
+  base: 100.5,
   // 走廊起迄半徑（整份 1/64 曼陀羅空間皆為走廊）
   corridorInner: 22,
-  corridorOuter: 88,
+  corridorOuter: 92.8,
 } as const;
 
 export const MANDALA_RADIUS = RING_RADII.hexagram;
@@ -472,7 +472,8 @@ export const MANDALA_GATES: GateInfo[] = RAVE_MANDALA_ORDER.map((gate, wheelInde
   const godheadIdx = Math.floor(((wheelIndex + 2) % 64) / 4);
   // 對齊天蠍與射手交界 = Gate 14 (52) 與 Gate 34 (53) 交界（52.5 => offset +5/6）
   const zodiacIdx = Math.floor((((wheelIndex + 5 / 6 + 64) % 64) / 64) * 12) % 12;
-  const trigramIdx = Math.floor(((wheelIndex - 4 + 64) % 64) / 8);
+  // 每 1/8 對齊 8 個閘門：乾卦從 Gate 1 (50) ~ Gate 11 (57)，起點對齊 idx = 2 (離卦 13..36)
+  const trigramIdx = Math.floor(((wheelIndex - 2 + 64) % 64) / 8);
 
   return {
     gate,

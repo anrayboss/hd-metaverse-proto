@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Billboard, Html, Text } from '@react-three/drei';
+import { Billboard, Html, Text, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import {
   CENTERS,
+  CenterId,
   CenterInfo,
   GateInfo,
   MANDALA_GATES,
@@ -13,6 +14,23 @@ import {
 import { ENABLE_SUN_GUIDE, useWorldStore } from '../store/useWorldStore';
 import { getActivePlanetList, PLANET_SYMBOLS } from '../engine/hdCalculator';
 import { useSceneConfigStore } from '../store/useSceneConfigStore';
+
+const BODYGRAPH_GLB_URL = '/models/bodygraph.glb';
+
+const CENTER_NAME_TO_ID: Record<string, CenterId> = {
+  center_head: 'head',
+  center_ajna: 'ajna',
+  center_throat: 'throat',
+  center_g: 'g',
+  center_ego: 'ego',
+  center_solar: 'solar',
+  center_spleen: 'spleen',
+  center_sacral: 'sacral',
+  center_root: 'root',
+};
+
+/** 旋風之環、奇蹟之環、啟迪者之環：雙圓球中間以短 bar 連接 */
+const DOUBLE_ORB_CODON_RINGS = new Set(['旋風之環', '奇蹟之環', '啟迪者之環']);
 
 interface GateHexagramProps {
   gate: GateInfo;
@@ -32,6 +50,7 @@ interface GateHexagramProps {
   centerMarkerScale: number;
   codonTokenY: number;
   centerInfo: CenterInfo;
+  centerGeometry?: THREE.BufferGeometry;
   onEnterCorridor: (gateNumber: number) => void;
 }
 
@@ -40,12 +59,30 @@ function CenterMiniMarker({
   color,
   position,
   scale,
+  angleRad,
+  customGeometry,
 }: {
   shape: CenterInfo['shape'];
   color: string;
   position: [number, number, number];
   scale: number;
+  angleRad: number;
+  customGeometry?: THREE.BufferGeometry;
 }) {
+  if (customGeometry) {
+    // 直接使用 bodygraph.glb 裡的真實中心模型（已置中並正規化大小）
+    return (
+      <mesh
+        geometry={customGeometry}
+        position={position}
+        rotation={[0, -angleRad - Math.PI / 2, 0]}
+        scale={scale}
+      >
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.28} />
+      </mesh>
+    );
+  }
+
   const rotZ =
     shape === 'triangle-down'
       ? Math.PI
@@ -87,6 +124,7 @@ function GateHexagram({
   centerMarkerScale,
   codonTokenY,
   centerInfo,
+  centerGeometry,
   onEnterCorridor,
 }: GateHexagramProps) {
   const portalRingRef = useRef<THREE.Mesh>(null);
@@ -254,23 +292,54 @@ function GateHexagram({
         </Text>
       </Billboard>
 
-      {/* 第 5 層：所屬中心彩色幾何塊狀體 */}
+      {/* 第 5 層：所屬中心立體示意（直接使用 bodygraph.glb 中心模型） */}
       <CenterMiniMarker
         shape={centerInfo.shape}
         color={centerInfo.color}
         position={centerPos}
         scale={centerMarkerScale}
+        angleRad={gate.angleRad}
+        customGeometry={centerGeometry}
       />
 
-      {/* 第 9 層：密碼子環 Token 珠 */}
-      <mesh position={codonPos}>
-        <sphereGeometry args={[0.75, 12, 12]} />
-        <meshStandardMaterial
-          color={gate.codonColor}
-          emissive={gate.codonColor}
-          emissiveIntensity={0.4}
-        />
-      </mesh>
+      {/* 第 9 層：密碼子環 Token 珠（旋風／奇蹟／啟迪者之環為雙圓球＋短 bar 連接） */}
+      {DOUBLE_ORB_CODON_RINGS.has(gate.codonRing) ? (
+        <group position={codonPos} rotation={[0, -gate.angleRad, 0]}>
+          <mesh position={[-0.62, 0, 0]}>
+            <sphereGeometry args={[0.48, 12, 12]} />
+            <meshStandardMaterial
+              color={gate.codonColor}
+              emissive={gate.codonColor}
+              emissiveIntensity={0.4}
+            />
+          </mesh>
+          <mesh position={[0.62, 0, 0]}>
+            <sphereGeometry args={[0.48, 12, 12]} />
+            <meshStandardMaterial
+              color={gate.codonColor}
+              emissive={gate.codonColor}
+              emissiveIntensity={0.4}
+            />
+          </mesh>
+          <mesh rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[0.16, 0.16, 1.15, 10]} />
+            <meshStandardMaterial
+              color={gate.codonColor}
+              emissive={gate.codonColor}
+              emissiveIntensity={0.4}
+            />
+          </mesh>
+        </group>
+      ) : (
+        <mesh position={codonPos}>
+          <sphereGeometry args={[0.72, 12, 12]} />
+          <meshStandardMaterial
+            color={gate.codonColor}
+            emissive={gate.codonColor}
+            emissiveIntensity={0.4}
+          />
+        </mesh>
+      )}
     </group>
   );
 }
@@ -290,7 +359,33 @@ export function MandalaRing3D() {
 
   const centerMap = useMemo(() => Object.fromEntries(CENTERS.map((c) => [c.id, c])), []);
 
-  const discRadius = RING_RADII.hexagram + 3.5;
+  // 從 bodygraph.glb 抽取 9 個中心模型幾何並置中正規化，直接用於 3D 曼陀羅中心示意層
+  const { scene: bodyGraphScene } = useGLTF(BODYGRAPH_GLB_URL);
+  const centerGeometries = useMemo(() => {
+    const map: Partial<Record<CenterId, THREE.BufferGeometry>> = {};
+    bodyGraphScene.traverse((obj) => {
+      const mesh = obj as THREE.Mesh;
+      if (!mesh.isMesh || !mesh.geometry) return;
+      const cid = CENTER_NAME_TO_ID[mesh.name.toLowerCase()];
+      if (!cid || map[cid]) return;
+      const geom = mesh.geometry.clone();
+      geom.computeBoundingBox();
+      if (geom.boundingBox) {
+        const size = new THREE.Vector3();
+        const center = new THREE.Vector3();
+        geom.boundingBox.getSize(size);
+        geom.boundingBox.getCenter(center);
+        geom.translate(-center.x, -center.y, -center.z);
+        const maxDim = Math.max(size.x, size.y, size.z, 0.001);
+        const normScale = 2.1 / maxDim;
+        geom.scale(normScale, normScale, normScale);
+      }
+      map[cid] = geom;
+    });
+    return map;
+  }, [bodyGraphScene]);
+
+  const discRadius = RING_RADII.hexagram + 3.8;
 
   // 實心圓盤（取消上緣凸起 bevel，讓圓盤頂面精確切齊 config.floorY，不會切到上方物件）
   const grandRingGeometry = useMemo(() => {
@@ -375,14 +470,14 @@ export function MandalaRing3D() {
       ctx.fill();
     }
 
-    // 2b. 只在各資料環交界（含星座與神格環之間、最外圈數字／象限到卦象之間）的薄環上填上定義爻線小色塊（逆時針 1→6 爻）
+    // 2b. 各獨立爻線小區塊薄環（獨立切出、完全不覆蓋資料層；星體圈外緣亦設爻線小色塊）
     const lineBlockBands: Array<[number, number]> = [
-      [34.5, 36.2], // 星體與密碼子環交界
-      [48.5, 50.2], // 八卦與星座環交界
-      [55.5, 57.2], // 星座與神格環之間
-      [62.5, 64.2], // 神格與中心示意環交界
-      [76.5, 78.2], // 阿拉伯數字與象限環交界
-      [83.5, RING_RADII.corridorOuter], // 象限／數字到卦象之間的 6 爻刻度細環
+      [32.5, 34.5], // 星體那圈外緣（密碼子環縮短，爻線填色移至此處）
+      [45.8, 47.8], // 獨立薄環 #1：八卦 ↔ 星座之間
+      [54.8, 56.8], // 獨立薄環 #2：星座 ↔ 神格之間
+      [63.8, 65.8], // 獨立薄環 #3：神格 ↔ 中心示意之間
+      [79.8, 81.8], // 獨立薄環 #4：阿拉伯數字 ↔ 象限之間
+      [88.8, RING_RADII.corridorOuter], // 最外圈：象限到卦象之間的 6 爻刻度細環
     ];
 
     for (const g of MANDALA_GATES) {
@@ -410,10 +505,10 @@ export function MandalaRing3D() {
       }
     }
 
-    // 3a. 最外圈（象限／數字到卦象之間）的 384 條 6 爻細刻度線（開放式不封外圈）
+    // 3a. 最外圈（88.8..92.8）的 384 條 6 爻細刻度線（開放式不封外圈）
     ctx.strokeStyle = isLight ? 'rgba(100, 116, 139, 0.45)' : 'rgba(148, 163, 184, 0.28)';
     ctx.lineWidth = 0.85;
-    const rTickInPx = rToPx(83.5);
+    const rTickInPx = rToPx(88.8);
     for (const g of MANDALA_GATES) {
       const startAngle = g.angleRad + sectorStep / 2;
       for (let line = 1; line < 6; line++) {
@@ -428,11 +523,11 @@ export function MandalaRing3D() {
     }
 
     // 3b. 依每一層資料的實際單位數獨立繪製切塊邊框（透明底色，不讓閘門分割線貫穿內外）：
-    //     - 64 塊：星體 (22..34.5)、密碼子環 (34.5..41.5)、中心示意 (62.5..69.5)、阿拉伯數字 (69.5..76.5) + 外圈 6 爻主刻度 (83.5..88)
-    //     - 8 塊：八卦 (41.5..48.5)
-    //     - 12 塊：星座 (48.5..55.5)
-    //     - 16 塊：神格 (55.5..62.5)
-    //     - 4 塊：象限 (76.5..83.5)
+    //     - 64 塊：星體 (22..34.5)、密碼子環 (34.5..38.8)、中心示意 (65.8..72.8)、阿拉伯數字 (72.8..79.8)、最外圈 6 爻主刻度 (88.8..92.8)
+    //     - 8 塊：八卦 (38.8..45.8)，每塊精準對齊 8 閘門（乾卦 = 1..11）
+    //     - 12 塊：星座 (47.8..54.8)，天蠍／射手對齊 14／34
+    //     - 16 塊：神格 (56.8..63.8)
+    //     - 4 塊：象限 (81.8..88.8)
     const wheelIdxToAngle = (idx: number) => -Math.PI / 2 - ((idx - 57.5) / 64) * Math.PI * 2;
     const drawRadialSegments = (angles: number[], rIn: number, rOut: number, lineW: number) => {
       const pIn = rToPx(rIn);
@@ -453,45 +548,50 @@ export function MandalaRing3D() {
     // 64 塊層（閘門分隔線寬度同步調參面板 gateDividerWidth）
     const gateAngles = MANDALA_GATES.map((g) => g.angleRad - sectorStep / 2);
     const bands64: Array<[number, number]> = [
-      [RING_RADII.atriumMax, 34.5], // 星體／生理環
-      [34.5, 41.5], // 密碼子環
-      [62.5, 69.5], // 中心示意環
-      [69.5, 76.5], // 阿拉伯數字環
-      [83.5, RING_RADII.corridorOuter], // 最外圈 6 爻主刻度
+      [RING_RADII.atriumMax, 34.5], // 星體圈（含外緣爻線區）
+      [34.5, 38.8], // 密碼子環（縮短）
+      [65.8, 72.8], // 中心示意環
+      [72.8, 79.8], // 阿拉伯數字環
+      [88.8, RING_RADII.corridorOuter], // 最外圈 6 爻主刻度
     ];
     for (const [rIn, rOut] of bands64) {
       drawRadialSegments(gateAngles, rIn, rOut, config.gateDividerWidth);
     }
 
-    // 八卦：8 塊（每塊涵蓋 8 個閘門，起於 idx = 4 - 0.5）
-    const trigramAngles = Array.from({ length: 8 }, (_, i) => wheelIdxToAngle(i * 8 + 4 - 0.5));
-    drawRadialSegments(trigramAngles, 41.5, 48.5, Math.max(2.2, config.gateDividerWidth * 0.9));
+    // 八卦：8 塊（乾卦從 Gate 1 (50) ~ Gate 11 (57)，邊界起於 idx = 2 - 0.5）
+    const trigramAngles = Array.from({ length: 8 }, (_, i) => wheelIdxToAngle(i * 8 + 2 - 0.5));
+    drawRadialSegments(trigramAngles, 38.8, 45.8, Math.max(2.2, config.gateDividerWidth * 0.9));
 
     // 星座：12 塊（天蠍／射手交界精準對齊 Gate 14／34 = 52.5）
     const zodiacAngles = Array.from({ length: 12 }, (_, i) =>
       wheelIdxToAngle(i * (64 / 12) - 5 / 6)
     );
-    drawRadialSegments(zodiacAngles, 48.5, 55.5, Math.max(2.2, config.gateDividerWidth * 0.9));
+    drawRadialSegments(zodiacAngles, 47.8, 54.8, Math.max(2.2, config.gateDividerWidth * 0.9));
 
     // 神格：16 塊（每塊涵蓋 4 個閘門，起於 idx = 62 - 0.5）
     const godheadAngles = Array.from({ length: 16 }, (_, i) => wheelIdxToAngle(i * 4 + 62 - 0.5));
-    drawRadialSegments(godheadAngles, 55.5, 62.5, Math.max(2.0, config.gateDividerWidth * 0.85));
+    drawRadialSegments(godheadAngles, 56.8, 63.8, Math.max(2.0, config.gateDividerWidth * 0.85));
 
     // 象限：4 塊（每塊涵蓋 16 個閘門，起於 idx = 2 - 0.5）
     const quadrantAngles = Array.from({ length: 4 }, (_, i) => wheelIdxToAngle(i * 16 + 2 - 0.5));
-    drawRadialSegments(quadrantAngles, 76.5, 83.5, Math.max(2.6, config.gateDividerWidth));
+    drawRadialSegments(quadrantAngles, 81.8, 88.8, Math.max(2.6, config.gateDividerWidth));
 
-    // 4. 各層同心圓框線（不封最外圈 R=88，保留通透感）
+    // 4. 各層同心圓框線（含獨立爻線小區塊環的內外邊界，不封最外圈 R=92.8 保留通透感）
     const ringDefs = [
       { r: RING_RADII.atriumMax, w: 2.8 },
+      { r: 32.5, w: 1.4 },
       { r: 34.5, w: 2.0 },
-      { r: 41.5, w: 2.0 },
-      { r: 48.5, w: 2.0 },
-      { r: 55.5, w: 2.0 },
-      { r: 62.5, w: 2.0 },
-      { r: 69.5, w: 2.0 },
-      { r: 76.5, w: 2.2 },
-      { r: 83.5, w: 2.4 },
+      { r: 38.8, w: 2.0 },
+      { r: 45.8, w: 2.0 },
+      { r: 47.8, w: 2.0 },
+      { r: 54.8, w: 2.0 },
+      { r: 56.8, w: 2.0 },
+      { r: 63.8, w: 2.0 },
+      { r: 65.8, w: 2.0 },
+      { r: 72.8, w: 2.0 },
+      { r: 79.8, w: 2.2 },
+      { r: 81.8, w: 2.2 },
+      { r: 88.8, w: 2.4 },
     ];
     ctx.strokeStyle = isLight ? 'rgba(51, 65, 85, 0.72)' : 'rgba(148, 163, 184, 0.48)';
     for (const ring of ringDefs) {
@@ -501,15 +601,15 @@ export function MandalaRing3D() {
       ctx.stroke();
     }
 
-    // 5. 3D 啟動星體符號（同 2D 做法：置於內資料環與中央人體圖之間，依星體列表順序沿放射方向由外向內排列）
+    // 5. 3D 啟動星體符號（位於星體圈內側 23..31，依星體列表順序沿放射方向由外向內排列）
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.font = 'bold 26px "Noto Sans TC", "Segoe UI Symbol", sans-serif';
+    ctx.font = 'bold 24px "Noto Sans TC", "Segoe UI Symbol", sans-serif';
     for (const g of MANDALA_GATES) {
       const list = gatePlanets.get(g.gate);
       if (!list || list.length === 0) continue;
       list.forEach((entry, idx) => {
-        const rSym = 32.2 - idx * 2.55;
+        const rSym = 30.8 - idx * 2.35;
         if (rSym < 22.8) return;
         const px = half + Math.cos(g.angleRad) * rToPx(rSym);
         const py = half + Math.sin(g.angleRad) * rToPx(rSym);
@@ -559,9 +659,9 @@ export function MandalaRing3D() {
       const a = -Math.PI / 2 - ((midIdx - 57.5) / 64) * Math.PI * 2;
       items.push({ key: `zod-${i}`, text: g.zodiac, r: RING_RADII.zodiac, angle: a, size: 1.45 });
     }
-    // 易經八卦（每 8 閘門 1 個）
+    // 易經八卦（每 8 閘門 1 個；乾卦對齊 Gate 1 (50) ~ Gate 11 (57)）
     for (let i = 0; i < 8; i++) {
-      const midIdx = (i * 8 + 4 + 3.5) % 64;
+      const midIdx = (i * 8 + 2 + 3.5) % 64;
       const g = MANDALA_GATES[Math.floor(midIdx)];
       const a = -Math.PI / 2 - ((midIdx - 57.5) / 64) * Math.PI * 2;
       items.push({ key: `tri-${i}`, text: g.trigram, r: RING_RADII.trigram, angle: a, size: 1.45 });
@@ -646,6 +746,7 @@ export function MandalaRing3D() {
           centerMarkerScale={config.centerMarkerScale}
           codonTokenY={config.codonTokenY}
           centerInfo={centerMap[gate.centerId]}
+          centerGeometry={centerGeometries[gate.centerId]}
           onEnterCorridor={(gateNum) => enterCorridorByGate(gateNum, 'in', 85)}
         />
       ))}
