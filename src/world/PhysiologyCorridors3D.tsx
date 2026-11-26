@@ -353,25 +353,17 @@ export function PhysiologyCorridors3D() {
 
   return (
     <group>
-      {/* 64 份完整 1/64 扇形空間（點擊任意一份直接進入該閘門走廊） */}
+      {/* 64 份完整 1/64 扇形點擊區（定義閘門底色 #fcf2e4 已直接繪於地板貼圖，此處僅保留點擊與當前走廊高亮） */}
       {MANDALA_GATES.map((gate) => {
         const isActive = isInCorridor && gate.wheelIndex === activeCorridorIndex;
-        const isRed = gate.gate === chart.redSun.gate;
-        const isBlack = gate.gate === chart.blackSun.gate;
-        const color = isActive
-          ? '#0284c7'
-          : isRed
-            ? '#ef4444'
-            : isBlack
-              ? '#f59e0b'
-              : QUADRANT_META[gate.quadrant].color;
-        const opacity = isActive ? 0.22 : isRed || isBlack ? 0.16 : 0.025;
+        const color = isActive ? '#0284c7' : QUADRANT_META[gate.quadrant].color;
+        const opacity = isActive ? 0.2 : 0;
 
         return (
           <mesh
             key={gate.gate}
             geometry={fullWedgeFloorGeometry}
-            position={[0, config.floorY + 0.04, 0]}
+            position={[0, config.floorY + 0.03, 0]}
             rotation={[0, -gate.angleRad, 0]}
             onClick={(e) => {
               e.stopPropagation();
@@ -387,9 +379,10 @@ export function PhysiologyCorridors3D() {
             <meshStandardMaterial
               color={color}
               emissive={color}
-              emissiveIntensity={isActive ? 0.45 : isRed || isBlack ? 0.3 : 0.05}
+              emissiveIntensity={isActive ? 0.45 : 0}
               transparent
               opacity={opacity}
+              depthWrite={false}
               side={THREE.DoubleSide}
             />
           </mesh>

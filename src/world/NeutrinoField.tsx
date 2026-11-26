@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import { Line } from '@react-three/drei';
 import * as THREE from 'three';
 import { getGateWorldPosition } from '../data/mandalaData';
-import { useWorldStore } from '../store/useWorldStore';
+import { ENABLE_SUN_GUIDE, useWorldStore } from '../store/useWorldStore';
 import { useSceneConfigStore } from '../store/useSceneConfigStore';
 
 const PARTICLE_COUNT = 2600;
@@ -125,29 +125,33 @@ export function NeutrinoField() {
         />
       </points>
 
-      <Line
-        points={redLinePoints}
-        color="#ff5544"
-        lineWidth={stage === 'red-sun' || stage === 'corridor' ? 2.6 : 1.3}
-        transparent
-        opacity={stage === 'red-sun' || stage === 'corridor' ? 0.88 : 0.42}
-      />
-      <mesh ref={redPulseRef}>
-        <sphereGeometry args={[1, 16, 16]} />
-        <meshBasicMaterial color="#ff7366" transparent opacity={0.95} />
-      </mesh>
+      {ENABLE_SUN_GUIDE && (
+        <>
+          <Line
+            points={redLinePoints}
+            color="#ff5544"
+            lineWidth={stage === 'red-sun' || stage === 'corridor' ? 2.6 : 1.3}
+            transparent
+            opacity={stage === 'red-sun' || stage === 'corridor' ? 0.88 : 0.42}
+          />
+          <mesh ref={redPulseRef}>
+            <sphereGeometry args={[1, 16, 16]} />
+            <meshBasicMaterial color="#ff7366" transparent opacity={0.95} />
+          </mesh>
 
-      <Line
-        points={blackLinePoints}
-        color="#f5d07a"
-        lineWidth={stage === 'black-sun' || stage === 'bodygraph' ? 2.6 : 1.3}
-        transparent
-        opacity={stage === 'black-sun' || stage === 'bodygraph' ? 0.88 : 0.42}
-      />
-      <mesh ref={blackPulseRef}>
-        <sphereGeometry args={[1, 16, 16]} />
-        <meshBasicMaterial color="#fef08a" transparent opacity={0.95} />
-      </mesh>
+          <Line
+            points={blackLinePoints}
+            color="#f5d07a"
+            lineWidth={stage === 'black-sun' || stage === 'bodygraph' ? 2.6 : 1.3}
+            transparent
+            opacity={stage === 'black-sun' || stage === 'bodygraph' ? 0.88 : 0.42}
+          />
+          <mesh ref={blackPulseRef}>
+            <sphereGeometry args={[1, 16, 16]} />
+            <meshBasicMaterial color="#fef08a" transparent opacity={0.95} />
+          </mesh>
+        </>
+      )}
     </group>
   );
 }

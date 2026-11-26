@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Billboard, Html, Text } from '@react-three/drei';
 import * as THREE from 'three';
@@ -10,7 +10,7 @@ import {
   QUADRANT_META,
   RING_RADII,
 } from '../data/mandalaData';
-import { useWorldStore } from '../store/useWorldStore';
+import { ENABLE_SUN_GUIDE, useWorldStore } from '../store/useWorldStore';
 import { useSceneConfigStore } from '../store/useSceneConfigStore';
 
 interface GateHexagramProps {
@@ -113,7 +113,7 @@ function GateHexagram({
           ? '#0f172a'
           : QUADRANT_META[gate.quadrant].color;
 
-  const isSpecial = isRedSun || isBlackSun;
+  const isSpecial = ENABLE_SUN_GUIDE && (isRedSun || isBlackSun);
 
   useFrame((state) => {
     if (portalRingRef.current) {
@@ -287,58 +287,102 @@ export function MandalaRing3D() {
 
   const centerMap = useMemo(() => Object.fromEntries(CENTERS.map((c) => [c.id, c])), []);
 
-  // 實心圓盤（中間不挖空，避免從下方看到人體圖背面）且整體降低，確保不切到任何物件
+  const discRadius = RING_RADII.hexagram + 3.5;
+
+  // 實心圓盤（取消上緣凸起 bevel，讓圓盤頂面精確切齊 config.floorY，不會切到上方物件）
   const grandRingGeometry = useMemo(() => {
     const outer = new THREE.Shape();
-    outer.absarc(0, 0, RING_RADII.hexagram + 3.5, 0, Math.PI * 2, false);
+    outer.absarc(0, 0, discRadius, 0, Math.PI * 2, false);
 
     const geom = new THREE.ExtrudeGeometry(outer, {
       depth: config.floorDepth,
-      bevelEnabled: true,
-      bevelThickness: 0.2,
-      bevelSize: 0.2,
-      bevelSegments: 2,
+      bevelEnabled: false,
       curveSegments: 96,
     });
     geom.rotateX(Math.PI / 2);
     return geom;
-  }, [config.floorDepth]);
+  }, [config.floorDepth, discRadius]);
 
-  // 10 層同心圓清晰分界線（對齊海報鳥瞰視角）
-  const concentricRings = useMemo(
-    () => [
-      { r: RING_RADII.atriumMax, w: 0.35 },
-      { r: 34.5, w: 0.22 },
-      { r: 41.5, w: 0.22 },
-      { r: 48.5, w: 0.22 },
-      { r: 55.5, w: 0.22 },
-      { r: 62.5, w: 0.22 },
-      { r: 69.5, w: 0.22 },
-      { r: 76.5, w: 0.28 },
-      { r: 83.5, w: 0.32 },
-    ],
-    []
-  );
+  // 直接繪製於地板頂面的高解析貼圖：包含定義閘門底色 (#fcf2e4)、64 等分放射分隔線與 10 層同心圓線
+  const floorTexture = useMemo(() => {
+    const size = 2048;
+    const half = size / 2;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
 
-  // 64 條完整放射分界線（從 R=22 貫穿至 R=88，清楚標出每份 1/64 閘門空間）
-  const sectorDividers = useMemo(() => {
+    const rToPx = (r: number) => (r / discRadius) * half;
+
+    // 1. 地板底色
+    ctx.fillStyle = isLight ? '#ffffff' : '#0c1324';
+    ctx.fillRect(0, 0, size, size);
+
+    // 2. 跑圖有定義（啟動）的閘門走廊填上底色 #fcf2e4
+    const activeSet = new Set(chart.activeGates);
     const sectorStep = (Math.PI * 2) / 64;
-    const len = RING_RADII.corridorOuter - RING_RADII.corridorInner;
-    const midR = (RING_RADII.corridorOuter + RING_RADII.corridorInner) / 2;
-    return MANDALA_GATES.map((g) => {
+    const rInnerPx = rToPx(RING_RADII.atriumMax);
+    const rOuterPx = rToPx(RING_RADII.corridorOuter);
+
+    ctx.fillStyle = isLight ? '#fcf2e4' : 'rgba(252, 242, 228, 0.16)';
+    for (const g of MANDALA_GATES) {
+      if (!activeSet.has(g.gate)) continue;
+      const a0 = g.angleRad - sectorStep / 2;
+      const a1 = g.angleRad + sectorStep / 2;
+      ctx.beginPath();
+      ctx.arc(half, half, rOuterPx, a0, a1, false);
+      ctx.arc(half, half, rInnerPx, a1, a0, true);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // 3. 64 等分 1/64 閘門放射分隔線（從 R=22 貫穿至 R=88）
+    ctx.strokeStyle = isLight ? 'rgba(100, 116, 139, 0.52)' : 'rgba(148, 163, 184, 0.35)';
+    ctx.lineWidth = 1.6;
+    for (const g of MANDALA_GATES) {
       const boundaryAngle = g.angleRad - sectorStep / 2;
-      return {
-        key: g.gate,
-        pos: [Math.cos(boundaryAngle) * midR, 0.08, Math.sin(boundaryAngle) * midR] as [
-          number,
-          number,
-          number,
-        ],
-        rotY: -boundaryAngle,
-        len,
-      };
-    });
-  }, []);
+      const cos = Math.cos(boundaryAngle);
+      const sin = Math.sin(boundaryAngle);
+      ctx.beginPath();
+      ctx.moveTo(half + cos * rInnerPx, half + sin * rInnerPx);
+      ctx.lineTo(half + cos * rOuterPx, half + sin * rOuterPx);
+      ctx.stroke();
+    }
+
+    // 4. 10 層同心圓清晰分隔線
+    const ringDefs = [
+      { r: RING_RADII.atriumMax, w: 2.8 },
+      { r: 34.5, w: 1.8 },
+      { r: 41.5, w: 1.8 },
+      { r: 48.5, w: 1.8 },
+      { r: 55.5, w: 1.8 },
+      { r: 62.5, w: 1.8 },
+      { r: 69.5, w: 1.8 },
+      { r: 76.5, w: 2.2 },
+      { r: 83.5, w: 2.4 },
+      { r: RING_RADII.corridorOuter, w: 2.4 },
+    ];
+    ctx.strokeStyle = isLight ? 'rgba(71, 85, 105, 0.68)' : 'rgba(148, 163, 184, 0.45)';
+    for (const ring of ringDefs) {
+      ctx.lineWidth = ring.w;
+      ctx.beginPath();
+      ctx.arc(half, half, rToPx(ring.r), 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.anisotropy = 8;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.needsUpdate = true;
+    return tex;
+  }, [chart.activeGates, isLight, discRadius]);
+
+  useEffect(() => {
+    return () => {
+      floorTexture?.dispose();
+    };
+  }, [floorTexture]);
 
   // 十六神格、十二星座、易經八卦大區塊鳥瞰文字（讓鳥瞰圖跟海報一樣清晰！）
   const ringLabels = useMemo(() => {
@@ -378,12 +422,11 @@ export function MandalaRing3D() {
     return items;
   }, []);
 
-  const lineY = config.floorY + 0.05;
   const labelY = config.ringLabelY;
 
   return (
     <group>
-      {/* 大阪世博大屋根扁平厚實心圓盤底盤（可用 Studio 即時微調高度 Y） */}
+      {/* 大阪世博大屋根扁平厚實心圓盤底盤（頂面精確切齊 config.floorY） */}
       <mesh geometry={grandRingGeometry} position={[0, config.floorY, 0]} receiveShadow>
         <meshStandardMaterial
           color={isLight ? '#ffffff' : '#0c1324'}
@@ -392,30 +435,23 @@ export function MandalaRing3D() {
         />
       </mesh>
 
-      {/* 10 層同心圓清晰分界線 */}
-      {concentricRings.map((ring, idx) => (
-        <mesh key={idx} rotation={[-Math.PI / 2, 0, 0]} position={[0, lineY, 0]}>
-          <ringGeometry args={[ring.r - ring.w / 2, ring.r + ring.w / 2, 128]} />
-          <meshBasicMaterial
-            color={isLight ? '#64748b' : '#475569'}
-            transparent
-            opacity={isLight ? 0.65 : 0.55}
-            side={THREE.DoubleSide}
+      {/* 直接繪製於地板頂面的曼陀羅貼圖（定義閘門 #fcf2e4 底色 + 64 放射分隔線 + 10 層同心圓） */}
+      {floorTexture && (
+        <mesh
+          rotation={[-Math.PI / 2, 0, 0]}
+          position={[0, config.floorY + 0.015, 0]}
+          receiveShadow
+        >
+          <circleGeometry args={[discRadius - 0.05, 128]} />
+          <meshStandardMaterial
+            map={floorTexture}
+            roughness={0.88}
+            metalness={0.02}
+            polygonOffset
+            polygonOffsetFactor={-1}
           />
         </mesh>
-      ))}
-
-      {/* 64 等分 1/64 閘門放射分界線 */}
-      {sectorDividers.map((s) => (
-        <mesh key={s.key} position={[s.pos[0], lineY, s.pos[2]]} rotation={[0, s.rotY, 0]}>
-          <boxGeometry args={[s.len, 0.06, 0.14]} />
-          <meshBasicMaterial
-            color={isLight ? '#94a3b8' : '#334155'}
-            transparent
-            opacity={isLight ? 0.55 : 0.4}
-          />
-        </mesh>
-      ))}
+      )}
 
       {/* 鳥瞰圖象限／神格／星座／八卦環文字（最低 Y=0.6 防陷進地板） */}
       {ringLabels.map((lbl) => (
