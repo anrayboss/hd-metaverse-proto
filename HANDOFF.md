@@ -1,52 +1,69 @@
-# HANDOFF.md — 人類設計宇宙專案遷移與完整上下文打包
+# HANDOFF.md — 人類設計宇宙 #1 & #2 完整上下文打包
 
-> 本檔整理自初始規劃與 Phase 1 原型開發對話（2026-11-24 ~ 2026-11-25），供新開獨立專案對話時直接讀取接手。
-> 新對話開局請先讀：`AGENTS.md` → `SPEC.md` → `WORLD.md` → 本檔。
-
----
-
-## 1. 專案定位與核心目標
-- **產品願景**：無 Mentor 的開放世界「人類設計宇宙」（對標 Promptasy 的自主探索學習＋小地圖的 3 個月變現與 Build in Public 模式）。
-- **價值主張**：把自主權還給你，在立體曼陀羅空間內自由探索、體驗微中子能量進出人體，找回自性（The Self）。
-- **核心設計底圖**：以 `D:\Victor's brain\附件\終極人類設計曼陀羅海報.pdf` 十層同心圓結構為核心，做成大阪世博「大屋根」式扁平厚實心圓盤建築。
-- **新手教學動線（零過場）**：輸入出生資料 → 紅太陽卦象（外環，出生前 88°）→ 沿該閘門 1/64 走廊由外向內穿越 8 層立體物件進入中央人體圖 → 再由內向外走黑太陽閘門走廊走出曼陀羅 → 進入自由探索模式。
+> 本檔整理至 **2026-11-27（HEAD `744456c`）**，涵蓋 **#1 基礎原型** 與 **#2 專業跑圖＋雙曼陀羅整合** 的完整脈絡，供新開對話直接接手。
+> 新對話開局建議依序讀取：`AGENTS.md` → `SPEC.md` → `WORLD.md` → 本檔（視需要補充 `D:\Victor's brain\人類設計宇宙整理.md` 與 `D:\Victor's brain\hd-metaverse-log.md` 近期幾筆）。
 
 ---
 
-## 2. 技術棧與關鍵架構決策
-- **核心套件**：`Vite 6` + `React 18` + `TypeScript` + `Three.js` + `@react-three/fiber` + `@react-three/drei` + `Zustand` + `leva`（僅 `DEV` 顯示）。
-- **資料層與渲染層解耦**：
-  - `src/engine/hdChart.ts`：簡化天文太陽黃經計算（誤差 < 0.05°；紅太陽精確退 88°），輸出標準 `ChartData`。未來可直接替換為 `Human Design Alive` API 或 `swisseph-wasm`，完全不動 3D 層。
-  - `src/data/mandalaData.ts`：完整 64 閘門 Rave Mandala 排序（已對齊海報鳥瞰方位：Gate 10/11 在 12 點鐘、Gate 55 在 10 點鐘）、16 神格、12 星座、8 八卦、22 個密碼子環（含 Victor 指定色碼與胺基酸）、九中心（已更新 Victor 指定色碼並移除 `biology`，改以閘門生理對應為主）。
-- **空間與互動實作**：
-  - **實心圓盤底盤**：[MandalaRing3D.tsx](src/world/MandalaRing3D.tsx) 中央不挖空、降低至 `floorY` 防裁切；64 卦象皆具備全填滿透明點擊區（點爻線空隙必中）＋ `<Billboard follow>` 永遠正對鏡頭（卦象與數字皆為 WebGL 原生，避免 64 個 DOM `<Html>` 卡頓）。
-  - **1/64 完整閘門走廊**：[PhysiologyCorridors3D.tsx](src/world/PhysiologyCorridors3D.tsx) 每一個閘門都是從 `R=88` 貫穿到 `R=22` 的獨立走廊，以極座標鎖定實現零物理引擎透明牆，走廊內設懸浮半透明填色左右箭頭切換鄰近閘門；In 依序經過 `象限 → 數字 → 中心塊狀體 → 神格 → 星座 → 八卦 → 密碼子環 Token → 生理對應 → 人體圖`，Out 順序完全相反。
-  - **中央人體圖**：[BodyGraph3D.tsx](src/world/BodyGraph3D.tsx) 已隱藏站立人體點雲（`showVertical3D = false`），中庭改用 Victor 匯入的 `public/models/bodygraph.glb`（`SplineAtriumBodyGraph`），第三步鏡頭已綁定至躺平人體圖俯視。
-  - **主題切換**：預設淺色模式，右上角支援一鍵切換淺／深色（3D 場景與 HUD 同步）。
-  - **即時調參與本機存檔**：[SceneStudioPanel.tsx](src/components/SceneStudioPanel.tsx) + [vite.config.ts](vite.config.ts)（`POST /__save-scene-config`），調整完按「💾 寫回本機 JSON」即可覆寫 [sceneConfig.json](src/data/sceneConfig.json) 進 Git。
+## 1. 專案定位與核心設計
+- **產品願景**：無 Mentor 的開放世界「人類設計宇宙」（空間體驗對標 GTA 6 無縫進出；探索／商業模式對標 Promptasy 與小地圖）。
+- **核心底圖**：`D:\Victor's brain\附件\終極人類設計曼陀羅海報.pdf` 十層同心圓結構，打造大阪世博「大屋根」式扁平實心圓盤建築。
+- **三視圖一體**：
+  1. **2D 本命圖**（`BodyGraph2DSvg.tsx`）：完整移植過往專案 `public/assets/body-graph.svg`，含九中心、64 閘門單/雙色、`coveringGates` 覆蓋與點擊跳 3D。
+  2. **2D 基礎曼陀羅**（`BasicMandala2D.tsx`）：純 SVG 向量四圈結構（最外圈 64 卦象無外框 → 6 爻小色塊 → 閘門阿拉伯數字 → 12 星座 → 放射星體符號 → 中央可點擊 2D 人體圖）。
+  3. **3D 終極曼陀羅元宇宙**（`UniverseScene.tsx`）：十層同心圓 3D 建築 + 64 條 `1/64` 貫穿走廊 + 中庭躺平 3D 人體圖（`public/models/bodygraph.glb`）+ 36 條可穿梭中空通道管。
 
 ---
 
-## 3. 協作規則與使用者偏好（務必遵守）
-- 遵守 [AGENTS.md](AGENTS.md)：每次檔案變動都要用**正體中文** commit，並**同步倒敘寫入** `D:\Victor's brain\hd-metaverse-log.md`。
-- 不主動建立 `README.md`（專案完成後再寫）。
-- 絕不覆蓋使用者手動調整的數值、幾何形狀（如 `head`/`ajna`/`ego` 三角朝向）或自定義命名。
-- 避免使用新細明體（PMingLiU）；所有介面與回覆皆使用正體中文（zh-TW）。
-- `.env` 嚴禁入版控，只追蹤 `.env.example`。
+## 2. 技術棧與關鍵檔案地圖
+- **核心套件**：`Vite 6` + `React 18` + `TypeScript` + `Three.js` + `@react-three/fiber` + `@react-three/drei` + `Zustand` + `leva`（僅 `DEV`）+ `swisseph-wasm`。
+- **計算引擎 (`src/engine/`)**：
+  - `ephemeris.ts`：封裝 `swisseph-wasm`（支援 `Chiron` 與 `Mean Lilith`），二分搜尋精確回推設計時刻（太陽退 88° 誤差 `0.000000°`）。
+  - `hdCalculator.ts`：30 星體黃經轉 `Gate/Line/Color/Tone/Base/FixingState`、即時 `analyzeBodygraph`（支援視角 `0/1/2` 與星體開關）、四箭頭 `VariableArrow`（含 `base` 1–5）、192 組人生主題 `resolveIncarnationCross` 與過往專案中文術語對照 `TERM_MAP`。
+  - `hdChart.ts` & `chartRecords.ts`：整合離線城市（`src/data/cities.ts`）與 IANA 時區，純 `localStorage` 存讀歷史跑圖紀錄（`src/data/chartRecords.json` 已排除於 `.gitignore`）。
+- **資料層 (`src/data/`)**：
+  - `mandalaData.ts`：64 閘門 Rave Mandala 序列（Gate 10/11 在 12 點鐘）、4 象限、8 八卦（乾卦對齊 Gate 1–11）、12 星座（天蠍／射手交界對齊 Gate 14／34）、16 神格、22 密碼子環（含雙球短 bar 造型與 90° 切線排列）、9 大中心與 36 條通道（已與 `src/data/通道字典.md` 對齊）。
+  - `fixings.ts` / `dictionary.json` / `crossNames.json`：384 爻曜升落陷規則、說明字典、192 組交叉名。
+  - `sceneConfig.json`：所有 3D 尺寸／高度與 23 項全站調色盤色碼之預設存檔。
+- **狀態管理 (`src/store/`)**：
+  - `useWorldStore.ts`：主題（預設 `light`）、`displayMode`（`bodygraph-2d` / `mandala-2d` / `universe-3d`）、`stage`（`ENABLE_SUN_GUIDE = false` 暫隱紅黑太陽導覽）、`viewMode`（`0/1/2`）、`variableDetailLevel`（`0` 隱藏 / `1` 純箭頭 / `2` CT / `3` CTB，預設 `3`）、`planetToggles`、`interiorSpace`、`activeCorridorIndex`、`corridorRadius`。
+  - `useSceneConfigStore.ts`：管理全場景參數與 23 項色碼，DEV 模式透過 `vite.config.ts` 的 `POST /__save-scene-config` 寫回 `sceneConfig.json`。
+- **3D 場景 (`src/world/`)**：
+  - `UniverseScene.tsx`：Canvas（啟用 `logarithmicDepthBuffer: true` 防高空 Z-fighting）、燈光、HDRI／星空與主場景掛載。
+  - `MandalaRing3D.tsx`：十層圓盤貼圖（獨立 4/8/12/16/64 切塊外框、6 圈 384 爻細刻度與小色塊、放射星體符號、純白底）+ 立體卦象／數字／GLB 中心示意三角體（純水平平移保留原始姿態）／雙球密碼子環。
+  - `BodyGraph3D.tsx`：`SplineAtriumBodyGraph`（載入使用者微調過的 `public/models/bodygraph.glb`）、36 條中空可穿梭 `ChannelConduit`（含 34/10 匯流至 57-20 主幹線、Gate 10 朝 9 點鐘水平接管）與 `VariableArrows3D`（`SVGLoader` 直接擠出 `body-graph.svg` 原版書法箭頭 + `Times New Roman` `CanvasTexture`，整組置中 Ajna 兩側，左側吸收／環境為純黑 `#000000`）。
+  - `PhysiologyCorridors3D.tsx`：1/64 閘門走廊極座標結構與側牆點擊切換鄰近閘門。
+  - `CameraRig.tsx` & `PlayerAvatar.tsx`：OrbitControls + 4 層優先權接管（人體圖內部自由步行 ↔ 走廊極座標 ↔ 定點過場 ↔ 鳥瞰自由探索）與金探子化身。
+- **UI 與調參 (`src/components/`)**：
+  - `HudOverlay.tsx` / `ChartResultPanel.tsx` / `InfoModal.tsx`：頂部操作列、右側跑圖抽屜（Zen HD、預設折疊 Ra 標籤包、四箭頭 4 檔滾輪＋觸控控制條、30 星體點擊直飛走廊）、左下操作提示（含橘色「退出人體圖內部空間」按鈕）。
+  - `SceneStudioPanel.tsx`：左上角標題下方 `.studio-leva-dock` 垂直堆疊 3 個折疊面板：① `🧭 檢視模式`（支援折疊態直接滾輪切換 2D / 曼陀羅 / 3D + 展開滑桿）、② `🎛️ 場景調參 Studio`（僅 3D 顯示，尺規置頂）、③ `🎨 全站調色盤 (2D / 3D)`（23 項色碼，2D/3D 共用；`useState(() => useCreateStore())` + `neverHide` 防 HMR 消失）。
+
+---
+
+## 3. 協作規則與使用者偏好（務必嚴格遵守）
+- **Git & Log 規範（見 `AGENTS.md`）**：
+  1. 每次專案檔案變動後務必檢查 `git status`（排除 `.env` 或無關暫存檔），並以**正體中文 + Conventional Commits** 提交。
+  2. 每則使用者指令與 Agent 操作重點必須**倒序寫入** `D:\Victor's brain\hd-metaverse-log.md`，timetag 與標題加橘色螢光筆 `==🟠[[YYYY-MM-DD (星期X)]] HH:mm \`hash\`｜\`...\`==`。
+- **程式碼與內容紅線**：
+  - 絕不覆蓋使用者手動調整的數值、`public/models/bodygraph.glb`、`AGENTS.md`、`src/data/通道字典.md` 或 `sceneConfig.json` 參數；修改任何檔案前先 `read_file`。
+  - 禁止主動建立 `README.md`；禁止使用新細明體（PMingLiU）；禁止使用任何 PROC 相關服務或工具。
+  - 全介面與回覆皆使用**正體中文（zh-TW）**，預設幣別 NTD、次要 USD；回覆風格精簡、直接給結果與實作細節。
+- **Windows PowerShell 5.1 注意**：串接指令不可用 `&&`，請用 `; if ($LASTEXITCODE -eq 0) { ... }`。
 
 ---
 
 ## 4. 常用指令
-```bash
-npm run dev      # 啟動本機預覽（http://localhost:5178/）+ leva 調參面板
-npm run verify   # 驗證 64 閘門曼陀羅資料完整性
-npm run build    # TypeScript 檢查 + Vite 正式建置
+```powershell
+npm run dev      # 啟動本機預覽（http://localhost:5178/）+ 調參與調色盤
+npm run verify   # 驗證 64 閘門資料完整性 + swisseph-wasm 30 星體回歸測試
+npm run build    # TypeScript 嚴格檢查 + Vite 正式建置
 ```
 
 ---
 
-## 5. 待辦與下一階段建議
-1. **推送遠端 GitHub**：已綁定 `origin`（`https://github.com/anrayboss/hd-metaverse-proto.git`），待在 GitHub 建立空 Repo 後執行 `git push -u origin main`。
-2. **串接完整跑圖資料**：將 `src/engine/hdChart.ts` 接入 `Human Design Alive` 完整 26 星體、9 中心定義與 36 通道點亮邏輯。
-3. **精細化走廊內容與關卡**：強化各閘門走廊內的生理對應／基因天命視覺表現，並實作第一批離線情境模擬關卡。
-4. **行動端與字型優化**：加入手機觸控微調與 CJK 字型子集切割，準備 Phase 1 公開體驗與 Build in Public 曝光。
+## 5. 下一階段待辦（開新對話建議優先順序）
+1. **終極曼陀羅十層分層控制**（`人類設計宇宙整理.md` L15）：在側欄或獨立面板實作各層顯隱開關與自訂層次排序（卦象、象限、數字、中心塊狀體、神格、星座、八卦、密碼子環、生理對應）。
+2. **走廊內部與情境關卡深化**：在 1/64 走廊與中心內室加入基因天命球體／生理對應 3D 知識積木與第一批互動練習關卡。
+3. **重啟完整新手導覽（`ENABLE_SUN_GUIDE`）**：當教學體驗準備好時，將 `useWorldStore.ts` 的 `ENABLE_SUN_GUIDE` 改為 `true` 並打磨紅太陽進 → 黑太陽出引導。
+4. **行動端體驗與字型優化**：微調手機觸控操作手感、確保 CJK 字型子集與 WebGL 資源載入效能。
+5. **推送遠端 GitHub**：遠端已設 `origin`（`https://github.com/anrayboss/hd-metaverse-proto.git`），待確認遠端 Repo 就緒後 `git push -u origin main`。
