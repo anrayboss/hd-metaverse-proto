@@ -30,8 +30,6 @@ const STATIONS_IN = [
 ];
 
 export function HudOverlay() {
-  const theme = useWorldStore((s) => s.theme);
-  const toggleTheme = useWorldStore((s) => s.toggleTheme);
   const displayMode = useWorldStore((s) => s.displayMode);
   const setDisplayMode = useWorldStore((s) => s.setDisplayMode);
   const stage = useWorldStore((s) => s.stage);
@@ -56,7 +54,6 @@ export function HudOverlay() {
   const enterCorridorByGate = useWorldStore((s) => s.enterCorridorByGate);
   const enterCenterInterior = useWorldStore((s) => s.enterCenterInterior);
   const enterChannelInterior = useWorldStore((s) => s.enterChannelInterior);
-  const exitInteriorSpace = useWorldStore((s) => s.exitInteriorSpace);
   const switchAdjacentCorridor = useWorldStore((s) => s.switchAdjacentCorridor);
   const setCorridorRadius = useWorldStore((s) => s.setCorridorRadius);
   const toggleCorridorDirection = useWorldStore((s) => s.toggleCorridorDirection);
@@ -122,14 +119,9 @@ export function HudOverlay() {
 
   return (
     <div className="hud-root">
-      <header className="hud-header">
-        <div className="hud-brand">
-          <span className="hud-brand__dot" />
-          <div>
-            <div className="hud-brand__title">人類設計宇宙｜1/64 閘門走廊</div>
-            <div className="hud-brand__sub">鳥瞰曼陀羅 · 瑞士星曆表 30 星體跑圖</div>
-          </div>
-        </div>
+      <header className="hud-header hud-header--minimal">
+        {/* 左上佔位（齒輪選單獨立固定於左上角） */}
+        <div className="hud-header__spacer" />
 
         {displayMode === 'universe-3d' && (
           <nav className="stage-pills">
@@ -149,20 +141,12 @@ export function HudOverlay() {
         <div className="header-actions">
           <button
             type="button"
-            className={`btn-outline ${showChartDrawer ? 'btn-outline--active' : ''}`}
+            className={`btn-outline btn-icon-emoji ${showChartDrawer ? 'btn-outline--active' : ''}`}
             onClick={() => setShowChartDrawer(!showChartDrawer)}
+            title={showChartDrawer ? '收合跑圖結果' : '展開跑圖結果'}
+            aria-label="跑圖結果"
           >
-            {showChartDrawer ? '收合跑圖面板' : '📊 跑圖結果'}
-          </button>
-          <button type="button" className="btn-ghost" onClick={toggleTheme}>
-            {theme === 'light' ? '🌙 深色' : '☀️ 淺色'}
-          </button>
-          <button
-            type="button"
-            className="btn-outline"
-            onClick={() => setShowReceiptModal(true)}
-          >
-            本命能量座標卡
+            📊
           </button>
         </div>
       </header>
@@ -431,34 +415,6 @@ export function HudOverlay() {
             </button>
           </div>
         </section>
-      )}
-
-      {displayMode === 'universe-3d' && (stage === 'free-roam' || interiorSpace) && (
-        <div className="controls-hint">
-          {interiorSpace ? (
-            <div className="controls-hint__interior-row">
-              <span>
-                <strong>人體圖內部漫遊</strong>｜<code>W A S D</code> 穿梭九中心與通道 · <code>Q / E</code> 升降
-              </span>
-              <button
-                type="button"
-                className="btn-primary controls-hint__exit-btn"
-                onClick={exitInteriorSpace}
-              >
-                退出人體圖內部空間 (Esc)
-              </button>
-            </div>
-          ) : (
-            <>
-              <span>
-                <strong>鳥瞰自由探索</strong>｜點擊任一<strong>卦象或 1/64 扇形空間</strong>即進入該閘門走廊
-              </span>
-              <span>
-                <code>W A S D</code> 移動 · <code>Q / E</code> 升降 · 滑鼠拖曳／滾輪縮放
-              </span>
-            </>
-          )}
-        </div>
       )}
 
       {/* 右側完整跑圖結果面板（Zen HD + Ra 標籤包預設折疊 + 視角/行星切換 + 30 星體列表） */}

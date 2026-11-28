@@ -26,7 +26,7 @@ export function App() {
     >
       {displayMode === 'universe-3d' ? <UniverseScene /> : <FlatChartStage />}
       <HudOverlay />
-      {import.meta.env.DEV && <SceneStudioPanel />}
+      <SceneStudioPanel />
       <IdleCinematicOverlay />
     </main>
   );

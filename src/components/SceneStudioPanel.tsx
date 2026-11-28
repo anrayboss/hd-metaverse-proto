@@ -248,6 +248,8 @@ function extractParamKeyFromId(id: string | null | undefined): StudioNumericKey 
 
 export function SceneStudioPanel() {
   const displayMode = useWorldStore((s) => s.displayMode);
+  const interiorSpace = useWorldStore((s) => s.interiorSpace);
+  const exitInteriorSpace = useWorldStore((s) => s.exitInteriorSpace);
   const setConfig = useSceneConfigStore((s) => s.setConfig);
   const setShowRuler = useSceneConfigStore((s) => s.setShowRuler);
   const hoveredRuler = useSceneConfigStore((s) => s.hoveredRuler);
@@ -255,6 +257,7 @@ export function SceneStudioPanel() {
   const saveStatus = useSceneConfigStore((s) => s.saveStatus);
   const studioFontSize = useSceneConfigStore((s) => s.config.studioFontSize);
 
+  const [gearOpen, setGearOpen] = useState(false);
   const studioWrapRef = useRef<HTMLDivElement>(null);
 
   // 用 useState 鎖定 store 參考，使其生命週期與 useControls 內部 useState 一致，避免 Vite HMR 時不同步導致面板變空隱藏
@@ -539,32 +542,111 @@ export function SceneStudioPanel() {
 
   return (
     <>
-      <div className="studio-leva-dock" style={{ width: `${dockWidthPx}px` }}>
-        <DisplayModeDockPanel fontSize={studioFontSize} />
-        {displayMode === 'universe-3d' && (
-          <div
-            ref={studioWrapRef}
-            className="studio-leva-dock__studio-wrap"
-            title="滑鼠移至任一參數上滾動滾輪或左右拖曳即可調整（按住 Shift 加速 5 倍）"
+      <div className="studio-gear-root">
+        {/* 左上 2D 齒輪按鈕：點擊展開／收合標題、模式切換、調參面板、調色盤與操作提示 */}
+        <button
+          type="button"
+          className={`studio-gear-btn ${gearOpen ? 'studio-gear-btn--open' : ''}`}
+          onClick={() => setGearOpen((v) => !v)}
+          aria-expanded={gearOpen}
+          aria-label="開啟設定與工具選單"
+          title="設定、檢視模式、調參與操作說明"
+        >
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.9"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
           >
+            <circle cx="12" cy="12" r="3.2" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+        </button>
+
+        {/* 以 display 控制顯隱而非 unmount，確保 Leva store 狀態不遺失 */}
+        <div
+          className="studio-leva-dock"
+          style={{
+            width: `${dockWidthPx}px`,
+            display: gearOpen ? 'flex' : 'none',
+          }}
+        >
+          {/* 原左上品牌標題 */}
+          <div className="studio-gear-brand">
+            <span className="hud-brand__dot" />
+            <div>
+              <div className="studio-gear-brand__title">人類設計宇宙｜1/64 閘門走廊</div>
+              <div className="studio-gear-brand__sub">鳥瞰曼陀羅 · 瑞士星曆表 30 星體跑圖</div>
+            </div>
+          </div>
+
+          <DisplayModeDockPanel fontSize={studioFontSize} />
+
+          {import.meta.env.DEV && displayMode === 'universe-3d' && (
+            <div
+              ref={studioWrapRef}
+              className="studio-leva-dock__studio-wrap"
+              title="滑鼠移至任一參數上滾動滾輪或左右拖曳即可調整（按住 Shift 加速 5 倍）"
+            >
+              <LevaPanel
+                store={studioStore}
+                theme={levaTheme}
+                fill
+                collapsed={true}
+                neverHide
+                titleBar={{ title: '🎛️ 場景調參 Studio', drag: false, filter: true }}
+              />
+            </div>
+          )}
+
+          {import.meta.env.DEV && (
             <LevaPanel
-              store={studioStore}
+              store={paletteStore}
               theme={levaTheme}
               fill
               collapsed={true}
               neverHide
-              titleBar={{ title: '🎛️ 場景調參 Studio', drag: false, filter: true }}
+              titleBar={{ title: '🎨 全站調色盤 (2D / 3D)', drag: false, filter: true }}
             />
-          </div>
-        )}
-        <LevaPanel
-          store={paletteStore}
-          theme={levaTheme}
-          fill
-          collapsed={true}
-          neverHide
-          titleBar={{ title: '🎨 全站調色盤 (2D / 3D)', drag: false, filter: true }}
-        />
+          )}
+
+          {/* 原左下操作提示（與人體圖內部退出鈕） */}
+          {displayMode === 'universe-3d' && (
+            <div className="studio-gear-hint">
+              {interiorSpace ? (
+                <>
+                  <div className="studio-gear-hint__line">
+                    <strong>人體圖內部漫遊</strong>｜<code>W A S D</code> 穿梭九中心與通道 ·{' '}
+                    <code>Q / E</code> 升降
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-primary controls-hint__exit-btn"
+                    style={{ width: '100%', marginTop: 6 }}
+                    onClick={exitInteriorSpace}
+                  >
+                    退出人體圖內部空間 (Esc)
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="studio-gear-hint__line">
+                    <strong>操作提示</strong>｜點擊任一卦象或 1/64 扇形進入走廊
+                  </div>
+                  <div className="studio-gear-hint__line">
+                    <code>W A S D</code> 移動 · <code>Q / E</code> 升降 · <code>Shift</code> 衝刺 ·{' '}
+                    <code>Shift + C</code> 電影待機
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {displayMode === 'universe-3d' && hoveredRuler && (
