@@ -1745,6 +1745,19 @@ body,
     right 0.75s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+.chart-drawer {
+  zoom: var(--chart-panel-zoom, 1);
+}
+
+.studio-leva-dock__studio-wrap {
+  width: 100%;
+}
+
+/* 滑鼠移至調參數值列時提示可直接滾輪或拖曳調整 */
+.studio-leva-dock__studio-wrap input[type='text'] {
+  cursor: ns-resize;
+}
+
 .idle-cinematic-caption {
   position: fixed;
   left: 50%;

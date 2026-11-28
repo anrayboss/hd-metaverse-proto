@@ -67,6 +67,9 @@ export interface SceneConfig {
   idleCameraDistCorridor: number;
   idleCameraDistInterior: number;
   idleZoomAmp: number;
+  // 介面字體尺寸
+  studioFontSize: number;
+  chartPanelFontSize: number;
   // 全站調色盤（2D 本命圖 / 2D 基礎曼陀羅 / 3D 元宇宙共用）
   colorDesign: string;
   colorPersonality: string;
@@ -102,6 +105,7 @@ export interface HoveredRulerInfo {
 
 interface SceneConfigState {
   config: SceneConfig;
+  savedConfig: SceneConfig;
   showRuler: boolean;
   hoveredRuler: HoveredRulerInfo | null;
   saveStatus: string;
@@ -116,6 +120,7 @@ export const DEFAULT_SCENE_CONFIG: SceneConfig = { ...initialConfig };
 
 export const useSceneConfigStore = create<SceneConfigState>((set, get) => ({
   config: { ...DEFAULT_SCENE_CONFIG },
+  savedConfig: { ...DEFAULT_SCENE_CONFIG },
   showRuler: false,
   hoveredRuler: null,
   saveStatus: '',
@@ -129,17 +134,22 @@ export const useSceneConfigStore = create<SceneConfigState>((set, get) => ({
 
   setHoveredRuler: (hoveredRuler) => set({ hoveredRuler }),
 
-  resetConfig: () => set({ config: { ...DEFAULT_SCENE_CONFIG }, saveStatus: '已還原初始值' }),
+  resetConfig: () =>
+    set((state) => ({
+      config: { ...state.savedConfig },
+      saveStatus: '已還原至已儲存數值',
+    })),
 
   saveToLocalFile: async () => {
     try {
+      const current = { ...get().config };
       const res = await fetch('/__save-scene-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(get().config),
+        body: JSON.stringify(current),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      set({ saveStatus: '✅ 已寫回 src/data/sceneConfig.json' });
+      set({ savedConfig: current, saveStatus: '✅ 已寫回 src/data/sceneConfig.json' });
     } catch {
       set({ saveStatus: '⚠️ 僅限本機 npm run dev 模式寫檔' });
     }
