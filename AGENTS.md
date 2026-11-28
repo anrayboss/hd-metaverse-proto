@@ -9,4 +9,4 @@
 
 ## log 規則
 
-1. **每則指令都要 log**：將使用者下的指令與 Agent 的操作重點倒序寫入 D:\Victor's brain\hd-metaverse-log.md。並且每則 timetag 和標題都加上橘色螢光筆以利辨識。以此記錄下完整開發過程與思路。日期部分自動採用 Ob winilink 連結每日筆記。
+1. **每則指令都要 log**：將使用者下的指令與 Agent 的操作重點倒序寫入 D:\Victor's brain\hd-metaverse-log.md。並且每則 timetag 和標題都加上橘色螢光筆以利辨識。以此記錄下完整開發過程與思路。日期部分自動採用 Ob winilink 連結每日筆記。.md 的標題不使用 ``，保持原始大字體方便我閱讀
