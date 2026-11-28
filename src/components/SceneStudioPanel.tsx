@@ -522,6 +522,10 @@ export function SceneStudioPanel() {
   const dockWidthPx = Math.round(280 * Math.max(1, studioFontSize / 11));
   const levaTheme = useMemo(
     () => ({
+      fonts: {
+        mono: '"Noto Sans TC", "Microsoft JhengHei", "PingFang TC", "Heiti TC", sans-serif',
+        sans: '"Noto Sans TC", "Microsoft JhengHei", "PingFang TC", "Heiti TC", sans-serif',
+      },
       fontSizes: {
         root: `${studioFontSize}px`,
       },

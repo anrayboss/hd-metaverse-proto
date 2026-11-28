@@ -1613,7 +1613,7 @@ body,
   border-radius: 10px;
   box-shadow: 0 0 9px 0 rgba(0, 0, 0, 0.45);
   overflow: hidden;
-  font-family: ui-monospace, SFMono-Regular, Menlo, 'Roboto Mono', monospace;
+  font-family: 'Noto Sans TC', 'Microsoft JhengHei', 'PingFang TC', 'Heiti TC', sans-serif;
   cursor: ns-resize;
 }
 
