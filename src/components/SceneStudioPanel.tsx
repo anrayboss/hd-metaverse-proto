@@ -210,7 +210,52 @@ export function SceneStudioPanel() {
           birdEyeHeight: { value: DEFAULT_SCENE_CONFIG.birdEyeHeight, min: 120, max: 320, step: 2, label: '鳥瞰高度' },
           bodyGraphCamY: { value: DEFAULT_SCENE_CONFIG.bodyGraphCamY, min: 10, max: 90, step: 1, label: '人體圖鏡頭 Y' },
           bodyGraphCamZ: { value: DEFAULT_SCENE_CONFIG.bodyGraphCamZ, min: 0.1, max: 60, step: 1, label: '人體圖鏡頭 Z' },
-          freeRoamSpeed: { value: DEFAULT_SCENE_CONFIG.freeRoamSpeed, min: 8, max: 80, step: 2, label: '自由漫遊速度' },
+        },
+        { collapsed: true }
+      ),
+      '金探子飛行與衝刺': folder(
+        {
+          freeRoamSpeed: { value: DEFAULT_SCENE_CONFIG.freeRoamSpeed, min: 4, max: 120, step: 1, label: '外部飛行速度' },
+          freeRoamSprintMultiplier: {
+            value: DEFAULT_SCENE_CONFIG.freeRoamSprintMultiplier,
+            min: 1.0,
+            max: 5.0,
+            step: 0.05,
+            label: '外部衝刺倍率 (Shift)',
+          },
+          interiorFlySpeed: { value: DEFAULT_SCENE_CONFIG.interiorFlySpeed, min: 1.0, max: 20.0, step: 0.2, label: '室內飛行速度' },
+          interiorSprintSpeed: {
+            value: DEFAULT_SCENE_CONFIG.interiorSprintSpeed,
+            min: 2.0,
+            max: 35.0,
+            step: 0.5,
+            label: '室內衝刺速度 (Shift)',
+          },
+        },
+        { collapsed: true }
+      ),
+      '待機電影模式': folder(
+        {
+          idleTimeoutSec: { value: DEFAULT_SCENE_CONFIG.idleTimeoutSec, min: 10, max: 600, step: 5, label: '閒置觸發秒數' },
+          idleOrbitSpeed: { value: DEFAULT_SCENE_CONFIG.idleOrbitSpeed, min: 0.02, max: 1.0, step: 0.02, label: '水平旋轉速度' },
+          idleVerticalSpeed: { value: DEFAULT_SCENE_CONFIG.idleVerticalSpeed, min: 0, max: 1.0, step: 0.02, label: '垂直起伏速度' },
+          idleVerticalAmp: { value: DEFAULT_SCENE_CONFIG.idleVerticalAmp, min: 0, max: 0.6, step: 0.02, label: '垂直起伏幅度' },
+          idleCameraDistFree: { value: DEFAULT_SCENE_CONFIG.idleCameraDistFree, min: 2, max: 30, step: 0.2, label: '外部距金探子距離' },
+          idleCameraDistCorridor: {
+            value: DEFAULT_SCENE_CONFIG.idleCameraDistCorridor,
+            min: 1.5,
+            max: 16,
+            step: 0.2,
+            label: '走廊距金探子距離',
+          },
+          idleCameraDistInterior: {
+            value: DEFAULT_SCENE_CONFIG.idleCameraDistInterior,
+            min: 1.5,
+            max: 12,
+            step: 0.2,
+            label: '室內距金探子距離',
+          },
+          idleZoomAmp: { value: DEFAULT_SCENE_CONFIG.idleZoomAmp, min: 0, max: 0.45, step: 0.02, label: '景深呼吸推拉幅度' },
         },
         { collapsed: true }
       ),

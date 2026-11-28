@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { IDLE_CINEMATIC_TIMEOUT_MS, useWorldStore } from '../store/useWorldStore';
+import { useWorldStore } from '../store/useWorldStore';
+import { useSceneConfigStore } from '../store/useSceneConfigStore';
 
 const TARGET_ASPECT = 16 / 9;
 
@@ -52,6 +53,7 @@ export function IdleCinematicOverlay() {
   const displayMode = useWorldStore((s) => s.displayMode);
   const isIdleCinematic = useWorldStore((s) => s.isIdleCinematic);
   const setIdleCinematic = useWorldStore((s) => s.setIdleCinematic);
+  const idleTimeoutSec = useSceneConfigStore((s) => s.config.idleTimeoutSec);
 
   const timerRef = useRef<number | null>(null);
   const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
@@ -88,7 +90,7 @@ export function IdleCinematicOverlay() {
         if (useWorldStore.getState().displayMode === 'universe-3d') {
           useWorldStore.getState().setIdleCinematic(true);
         }
-      }, IDLE_CINEMATIC_TIMEOUT_MS);
+      }, Math.max(5, idleTimeoutSec) * 1000);
     };
 
     const wakeAndReset = () => {
@@ -147,7 +149,7 @@ export function IdleCinematicOverlay() {
       window.removeEventListener('touchmove', wakeAndReset);
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [displayMode, setIdleCinematic]);
+  }, [displayMode, setIdleCinematic, idleTimeoutSec]);
 
   if (displayMode !== 'universe-3d') return null;
 

@@ -55,6 +55,18 @@ export interface SceneConfig {
   bodyGraphCamY: number;
   bodyGraphCamZ: number;
   freeRoamSpeed: number;
+  freeRoamSprintMultiplier: number;
+  interiorFlySpeed: number;
+  interiorSprintSpeed: number;
+  // 待機電影模式
+  idleTimeoutSec: number;
+  idleOrbitSpeed: number;
+  idleVerticalSpeed: number;
+  idleVerticalAmp: number;
+  idleCameraDistFree: number;
+  idleCameraDistCorridor: number;
+  idleCameraDistInterior: number;
+  idleZoomAmp: number;
   // 全站調色盤（2D 本命圖 / 2D 基礎曼陀羅 / 3D 元宇宙共用）
   colorDesign: string;
   colorPersonality: string;

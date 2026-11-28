@@ -216,16 +216,29 @@ export function CameraRig() {
       orbit.elapsed += delta;
       const t = orbit.elapsed;
 
+      // 依當前空間動態採用調參面板設定的距離
+      const baseRadius =
+        currentMode === 'interior'
+          ? config.idleCameraDistInterior
+          : currentMode === 'corridor'
+            ? config.idleCameraDistCorridor
+            : config.idleCameraDistFree;
+
       // 水平緩慢公轉（帶微妙速度起伏）＋ 垂直多頻波起伏 ＋ 緩慢推拉景深
-      const azimuthSpeed = (0.16 + Math.sin(t * 0.19) * 0.045) * orbit.azimuthDir;
+      const azimuthSpeed =
+        config.idleOrbitSpeed * (1 + Math.sin(t * 0.19) * 0.25) * orbit.azimuthDir;
       orbit.azimuth += azimuthSpeed * delta;
 
+      const vSpeed = config.idleVerticalSpeed;
+      const vAmp = config.idleVerticalAmp;
       const targetPolar = THREE.MathUtils.clamp(
-        1.05 + Math.sin(t * 0.24) * 0.34 + Math.sin(t * 0.11 + 1.3) * 0.14,
-        0.46,
-        1.42
+        1.05 +
+          Math.sin(t * vSpeed) * vAmp +
+          Math.sin(t * vSpeed * 0.46 + 1.3) * (vAmp * 0.4),
+        0.44,
+        1.44
       );
-      const targetRadius = orbit.baseRadius * (1 + Math.sin(t * 0.17 + 0.6) * 0.16);
+      const targetRadius = baseRadius * (1 + Math.sin(t * 0.17 + 0.6) * config.idleZoomAmp);
 
       const sinP = Math.sin(targetPolar);
       desiredCamVec.set(
@@ -283,7 +296,10 @@ export function CameraRig() {
       enteredCenterIdRef.current = entryKey;
 
       const keys = keysPressed.current;
-      const speed = (keys['ShiftLeft'] || keys['ShiftRight'] ? 7.5 : 3.4) * delta;
+      const speed =
+        (keys['ShiftLeft'] || keys['ShiftRight']
+          ? config.interiorSprintSpeed
+          : config.interiorFlySpeed) * delta;
       moveDelta.set(0, 0, 0);
       camera.getWorldDirection(forward);
       forward.y = 0;
@@ -516,8 +532,9 @@ export function CameraRig() {
 
     const keys = keysPressed.current;
     const speed =
-      (keys['ShiftLeft'] || keys['ShiftRight'] ? config.freeRoamSpeed * 1.85 : config.freeRoamSpeed) *
-      delta;
+      (keys['ShiftLeft'] || keys['ShiftRight']
+        ? config.freeRoamSpeed * config.freeRoamSprintMultiplier
+        : config.freeRoamSpeed) * delta;
     moveDelta.set(0, 0, 0);
 
     camera.getWorldDirection(forward);
