@@ -645,7 +645,7 @@ export function CameraRig() {
         inInterior
       }
       minDistance={1.5}
-      maxDistance={290}
+      maxDistance={360}
       maxPolarAngle={Math.PI / 2}
       onStart={() => {
         isUserInteracting.current = true;

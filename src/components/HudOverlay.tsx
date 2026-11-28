@@ -6,12 +6,12 @@ import { ChartResultPanel } from './ChartResultPanel';
 import { InfoModal, InfoModalRequest } from './InfoModal';
 
 const ALL_STAGE_STEPS: Array<{ id: JourneyStage; label: string }> = [
-  { id: 'intro', label: '0. 鳥瞰入口' },
-  { id: 'red-sun', label: '1. 紅太陽卦象' },
-  { id: 'corridor', label: '2. 閘門走廊 (In)' },
-  { id: 'bodygraph', label: '3. 人體圖中庭' },
-  { id: 'black-sun', label: '4. 黑太陽走廊 (Out)' },
-  { id: 'free-roam', label: '5. 鳥瞰自由探索' },
+  { id: 'intro', label: '鳥瞰入口' },
+  { id: 'red-sun', label: '紅太陽卦象' },
+  { id: 'corridor', label: '閘門走廊 (In)' },
+  { id: 'bodygraph', label: '人體圖中庭' },
+  { id: 'black-sun', label: '黑太陽走廊 (Out)' },
+  { id: 'free-roam', label: '鳥瞰自由探索' },
 ];
 
 const STAGE_STEPS = ENABLE_SUN_GUIDE

@@ -193,7 +193,7 @@ const STUDIO_PARAM_SPECS: Record<StudioNumericKey, ParamSpec> = {
   directionalIntensity: { min: 0.2, max: 3.5, step: 0.05, label: '方向光強度' },
   centerPointLightIntensity: { min: 0, max: 12, step: 0.2, label: '中庭頂光強度' },
   fogDensity: { min: 0, max: 0.008, step: 0.0002, label: '迷霧濃度' },
-  birdEyeHeight: { min: 120, max: 320, step: 2, label: '鳥瞰高度' },
+  birdEyeHeight: { min: 120, max: 380, step: 2, label: '鳥瞰高度' },
   bodyGraphCamY: { min: 10, max: 90, step: 1, label: '人體圖鏡頭 Y' },
   bodyGraphCamZ: { min: 0.1, max: 60, step: 1, label: '人體圖鏡頭 Z' },
   // 金探子飛行與衝刺
