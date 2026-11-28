@@ -176,6 +176,7 @@ const STUDIO_PARAM_SPECS: Record<StudioNumericKey, ParamSpec> = {
   channelPulseSpeed: { min: 0.05, max: 2.0, step: 0.05, label: '微中子流速' },
   channelRingOpacity: { min: 0, max: 1, step: 0.02, label: '管內導光環濃度' },
   junctionSphereRadius: { min: 0.1, max: 0.9, step: 0.02, label: '34/10 匯流點半徑' },
+  rootSideChannelOffsetZ: { min: -3.0, max: 3.0, step: 0.05, label: '根部側6管位移 Z' },
   // 1/64 閘門走廊
   corridorWallHeight: { min: 2, max: 14, step: 0.2, label: '透明牆高度' },
   corridorWallOpacity: { min: 0.02, max: 0.6, step: 0.02, label: '透明牆濃度' },
@@ -321,6 +322,7 @@ export function SceneStudioPanel() {
           channelPulseSpeed: numCtrl('channelPulseSpeed'),
           channelRingOpacity: numCtrl('channelRingOpacity'),
           junctionSphereRadius: numCtrl('junctionSphereRadius'),
+          rootSideChannelOffsetZ: numCtrl('rootSideChannelOffsetZ'),
         },
         { collapsed: true }
       ),

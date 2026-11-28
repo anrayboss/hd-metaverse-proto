@@ -42,6 +42,7 @@ export interface SceneConfig {
   channelPulseSpeed: number;
   channelRingOpacity: number;
   junctionSphereRadius: number;
+  rootSideChannelOffsetZ: number;
   // 微中子流場
   neutrinoPointSize: number;
   neutrinoOpacity: number;
@@ -127,7 +128,7 @@ interface SceneConfigState {
   saveToLocalFile: () => Promise<void>;
 }
 
-const rawInitial = initialConfig as Partial<SceneConfig>;
+const rawInitial = initialConfig as unknown as Partial<SceneConfig>;
 export const DEFAULT_SCENE_CONFIG: SceneConfig = {
   ...(rawInitial as SceneConfig),
   gateDigitOffsets: { ...(rawInitial.gateDigitOffsets ?? {}) },

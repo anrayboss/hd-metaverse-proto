@@ -35,6 +35,9 @@ const INTEGRATION_BRANCH_IDS = new Set(['10-20', '34-20', '34-10', '57-10', '34-
 /** 位於脾臟／情緒三角形尖角附近的閘門，管線端點內縮避免戳穿中心房間 */
 const CORNER_TIGHT_GATES = new Set([30, 36, 18, 48]);
 
+/** 根中心左右兩側 6 條通道端點（58/41/38/54/39/19），同步沿鳥瞰下方（+Z）平移並保持通道連接 */
+const ROOT_SIDE_SHIFT_GATES = new Set([58, 41, 38, 54, 39, 19]);
+
 /** 三角形中心（較窄尖角），閘門數字需較大幅度往中心內縮避免超出邊界 */
 const TRIANGLE_CENTERS = new Set<CenterId>(['head', 'ajna', 'ego', 'solar', 'spleen']);
 
@@ -941,8 +944,17 @@ function SplineAtriumBodyGraph({
 
       {/* 一般通道中空管線（與九中心連通，點擊可選中並進入人體圖內部空間） */}
       {standardChannels.map((ch) => {
-        const s = gatePositions[ch.gates[0]];
-        const e = gatePositions[ch.gates[1]];
+        const rawS = gatePositions[ch.gates[0]];
+        const rawE = gatePositions[ch.gates[1]];
+        const dz = config.rootSideChannelOffsetZ ?? 0;
+        const s =
+          dz !== 0 && ROOT_SIDE_SHIFT_GATES.has(ch.gates[0])
+            ? new THREE.Vector3(rawS.x, rawS.y, rawS.z + dz)
+            : rawS;
+        const e =
+          dz !== 0 && ROOT_SIDE_SHIFT_GATES.has(ch.gates[1])
+            ? new THREE.Vector3(rawE.x, rawE.y, rawE.z + dz)
+            : rawE;
         const extStart = CORNER_TIGHT_GATES.has(ch.gates[0]) ? -0.14 : 0.35;
         const extEnd = CORNER_TIGHT_GATES.has(ch.gates[1]) ? -0.14 : 0.35;
         return (
