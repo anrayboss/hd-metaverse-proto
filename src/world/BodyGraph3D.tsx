@@ -1,5 +1,5 @@
-import { Suspense, useEffect, useMemo, useRef } from 'react';
-import { ThreeEvent, useFrame } from '@react-three/fiber';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { ThreeEvent, useFrame, useThree } from '@react-three/fiber';
 import { Line, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { SVGLoader } from 'three/examples/jsm/loaders/SVGLoader.js';
@@ -414,162 +414,197 @@ function createGateDigitTexture(gateNum: number, color: string): THREE.CanvasTex
   return tex;
 }
 
-/** 計算立體浮雕側面較暗色，讓突出表面的黑體數字呈現清晰厚度感 */
-function darkenHexColor(hex: string, factor = 0.55): string {
-  const c = new THREE.Color(hex);
-  c.multiplyScalar(factor);
-  return `#${c.getHexString()}`;
-}
-
 /**
- * 3D 人體圖中心表面立體閘門數字：
- * - 採用原閘門方塊的水平 (x, z) 座標，正擺於所屬中心頂面（不跟隨鏡頭）
- * - 有定義閘門：多層立體擠出突出中心表面，顏色可由調色盤指定
- * - 無定義閘門：單層緊貼中心表面不突出
+ * 3D 人體圖中心表面平面黑體閘門數字：
+ * - 全部 64 閘門統一採平面正擺黑體數字（不跟隨鏡頭）、統一採用 colorBodyGraphGateUndefined 色碼
+ * - 開啟調參面板「✋ 拖曳調整閘門數字位置」後，可直接用滑鼠於中心表面即時拖曳各閘門位置並寫回 JSON
  */
 function BodyGraphGateNumbers3D({
   gatePositions,
   centerPositions,
   centerTopYs,
-  activeGates,
   isInInterior,
   onSelectGate,
 }: {
   gatePositions: Record<number, THREE.Vector3>;
   centerPositions: Partial<Record<CenterId, THREE.Vector3>>;
   centerTopYs: Partial<Record<CenterId, number>>;
-  activeGates: number[];
   isInInterior: boolean;
   onSelectGate: (gateNum: number, pos: THREE.Vector3) => void;
 }) {
+  const { camera, gl } = useThree();
+  const groupRef = useRef<THREE.Group>(null);
   const config = useSceneConfigStore((s) => s.config);
-  const activeSet = useMemo(() => new Set(activeGates), [activeGates]);
+  const editGateDigits = useSceneConfigStore((s) => s.editGateDigits);
+  const setIsDraggingGateDigit = useSceneConfigStore((s) => s.setIsDraggingGateDigit);
+  const setGateDigitOffset = useSceneConfigStore((s) => s.setGateDigitOffset);
+  const [draggingGate, setDraggingGate] = useState<number | null>(null);
+
+  const dragCtxRef = useRef<{
+    gateNum: number;
+    baseX: number;
+    baseZ: number;
+    planeWorldY: number;
+    grabOffsetX: number;
+    grabOffsetZ: number;
+  } | null>(null);
+
   const gateEntries = useMemo(
     () =>
       Object.entries(gatePositions)
-        .map(([k, pos]) => ({ gateNum: Number(k), pos }))
+        .map(([k, pos]) => {
+          const gateNum = Number(k);
+          const info = GATE_BY_NUMBER[gateNum];
+          const centerId = info?.centerId;
+          const centerPos = centerId ? centerPositions[centerId] : undefined;
+          const surfaceY = (centerId ? centerTopYs[centerId] : undefined) ?? pos.y;
+          const insetRatio = centerId && TRIANGLE_CENTERS.has(centerId) ? 0.36 : 0.25;
+          const baseX = centerPos ? THREE.MathUtils.lerp(pos.x, centerPos.x, insetRatio) : pos.x;
+          const baseZ = centerPos ? THREE.MathUtils.lerp(pos.z, centerPos.z, insetRatio) : pos.z;
+          return { gateNum, pos, baseX, baseZ, surfaceY };
+        })
         .filter((item) => Number.isFinite(item.gateNum)),
-    [gatePositions]
-  );
-
-  const sideColor = useMemo(
-    () => darkenHexColor(config.colorBodyGraphGateDefined, 0.52),
-    [config.colorBodyGraphGateDefined]
+    [gatePositions, centerPositions, centerTopYs]
   );
 
   const textures = useMemo(() => {
-    const defTop = new Map<number, THREE.CanvasTexture>();
-    const defSide = new Map<number, THREE.CanvasTexture>();
-    const undef = new Map<number, THREE.CanvasTexture>();
+    const map = new Map<number, THREE.CanvasTexture>();
     for (const { gateNum } of gateEntries) {
-      defTop.set(gateNum, createGateDigitTexture(gateNum, config.colorBodyGraphGateDefined));
-      defSide.set(gateNum, createGateDigitTexture(gateNum, sideColor));
-      undef.set(gateNum, createGateDigitTexture(gateNum, config.colorBodyGraphGateUndefined));
+      map.set(gateNum, createGateDigitTexture(gateNum, config.colorBodyGraphGateUndefined));
     }
-    return { defTop, defSide, undef };
-  }, [
-    gateEntries,
-    config.colorBodyGraphGateDefined,
-    config.colorBodyGraphGateUndefined,
-    sideColor,
-  ]);
+    return map;
+  }, [gateEntries, config.colorBodyGraphGateUndefined]);
 
   useEffect(() => {
     return () => {
-      textures.defTop.forEach((t) => t.dispose());
-      textures.defSide.forEach((t) => t.dispose());
-      textures.undef.forEach((t) => t.dispose());
+      textures.forEach((t) => t.dispose());
     };
   }, [textures]);
 
-  const extrudeLayers = 6;
-  const extrudeHeight = Math.max(0.02, config.bodyGraphGateExtrude);
+  // 監聽全域 pointermove / pointerup 完成精準水平面拖曳
+  useEffect(() => {
+    if (draggingGate === null) return;
+
+    const raycaster = new THREE.Raycaster();
+    const ndc = new THREE.Vector2();
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    const hitWorld = new THREE.Vector3();
+    const hitLocal = new THREE.Vector3();
+
+    const onPointerMove = (e: PointerEvent) => {
+      const ctx = dragCtxRef.current;
+      const grp = groupRef.current;
+      if (!ctx || !grp) return;
+
+      const rect = gl.domElement.getBoundingClientRect();
+      ndc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      ndc.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(ndc, camera);
+      plane.constant = -ctx.planeWorldY;
+
+      if (raycaster.ray.intersectPlane(plane, hitWorld)) {
+        hitLocal.copy(hitWorld);
+        grp.worldToLocal(hitLocal);
+        const targetX = hitLocal.x - ctx.grabOffsetX;
+        const targetZ = hitLocal.z - ctx.grabOffsetZ;
+        setGateDigitOffset(ctx.gateNum, targetX - ctx.baseX, targetZ - ctx.baseZ);
+      }
+    };
+
+    const onPointerUp = () => {
+      dragCtxRef.current = null;
+      setDraggingGate(null);
+      setIsDraggingGateDigit(false);
+      document.body.style.cursor = editGateDigits ? 'grab' : 'auto';
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+    };
+  }, [draggingGate, camera, gl, editGateDigits, setGateDigitOffset, setIsDraggingGateDigit]);
+
   const size = config.bodyGraphGateNumSize;
+  const offsets = config.gateDigitOffsets ?? {};
 
   return (
-    <group name="BodyGraphGateNumbers3D">
-      {gateEntries.map(({ gateNum, pos }) => {
-        const info = GATE_BY_NUMBER[gateNum];
-        const centerId = info?.centerId;
-        const centerPos = centerId ? centerPositions[centerId] : undefined;
-        const surfaceY = (centerId ? centerTopYs[centerId] : undefined) ?? pos.y;
+    <group ref={groupRef} name="BodyGraphGateNumbers3D">
+      {gateEntries.map(({ gateNum, pos, baseX, baseZ, surfaceY }) => {
+        const tex = textures.get(gateNum);
+        if (!tex) return null;
 
-        // 沿著原閘門水平方位向所屬中心內部收縮，確保所有立體數字穩穩落在九中心表面之內不超框
-        const insetRatio = centerId && TRIANGLE_CENTERS.has(centerId) ? 0.36 : 0.25;
-        const digitX = centerPos ? THREE.MathUtils.lerp(pos.x, centerPos.x, insetRatio) : pos.x;
-        const digitZ = centerPos ? THREE.MathUtils.lerp(pos.z, centerPos.z, insetRatio) : pos.z;
+        const savedOff = offsets[String(gateNum)];
+        const digitX = baseX + (savedOff ? savedOff[0] : 0);
+        const digitZ = baseZ + (savedOff ? savedOff[1] : 0);
+        const isDraggingThis = draggingGate === gateNum;
 
-        const isActive = activeSet.has(gateNum);
+        return (
+          <group
+            key={gateNum}
+            name={`GateDigit_${gateNum}`}
+            position={[digitX, surfaceY + 0.015, digitZ]}
+          >
+            {/* 編輯模式下的半透明拖曳輔助底框 */}
+            {editGateDigits && !isInInterior && (
+              <mesh position={[0, -0.002, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                <circleGeometry args={[size * 0.56, 20]} />
+                <meshBasicMaterial
+                  color={isDraggingThis ? '#f59e0b' : '#38bdf8'}
+                  transparent
+                  opacity={isDraggingThis ? 0.36 : 0.16}
+                  depthWrite={false}
+                  toneMapped={false}
+                />
+              </mesh>
+            )}
 
-        if (!isActive) {
-          const tex = textures.undef.get(gateNum);
-          if (!tex) return null;
-          return (
             <mesh
-              key={gateNum}
-              name={`GateDigit_${gateNum}`}
-              position={[digitX, surfaceY + 0.014, digitZ]}
               rotation={[-Math.PI / 2, 0, 0]}
+              onPointerDown={(e) => {
+                if (!editGateDigits || isInInterior) return;
+                e.stopPropagation();
+                const grp = groupRef.current;
+                if (!grp) return;
+                const worldPos = new THREE.Vector3(digitX, surfaceY + 0.015, digitZ);
+                grp.localToWorld(worldPos);
+                const hitLocal = e.point.clone();
+                grp.worldToLocal(hitLocal);
+                dragCtxRef.current = {
+                  gateNum,
+                  baseX,
+                  baseZ,
+                  planeWorldY: worldPos.y,
+                  grabOffsetX: hitLocal.x - digitX,
+                  grabOffsetZ: hitLocal.z - digitZ,
+                };
+                setDraggingGate(gateNum);
+                setIsDraggingGateDigit(true);
+                document.body.style.cursor = 'grabbing';
+              }}
               onClick={(e) => {
-                if (isInInterior) return;
+                if (isInInterior || editGateDigits) return;
                 e.stopPropagation();
                 onSelectGate(gateNum, pos);
               }}
               onPointerOver={(e) => {
                 if (isInInterior) return;
                 e.stopPropagation();
-                document.body.style.cursor = 'pointer';
+                document.body.style.cursor = editGateDigits
+                  ? draggingGate !== null
+                    ? 'grabbing'
+                    : 'grab'
+                  : 'pointer';
               }}
               onPointerOut={() => {
-                if (isInInterior) return;
+                if (isInInterior || draggingGate !== null) return;
                 document.body.style.cursor = 'auto';
               }}
             >
               <planeGeometry args={[size, size]} />
               <meshBasicMaterial map={tex} transparent depthWrite={false} toneMapped={false} />
             </mesh>
-          );
-        }
-
-        const topTex = textures.defTop.get(gateNum);
-        const sideTex = textures.defSide.get(gateNum);
-        if (!topTex || !sideTex) return null;
-
-        return (
-          <group
-            key={gateNum}
-            name={`GateDigit_${gateNum}_Defined`}
-            position={[digitX, surfaceY + 0.014, digitZ]}
-            onClick={(e) => {
-              if (isInInterior) return;
-              e.stopPropagation();
-              onSelectGate(gateNum, pos);
-            }}
-            onPointerOver={(e) => {
-              if (isInInterior) return;
-              e.stopPropagation();
-              document.body.style.cursor = 'pointer';
-            }}
-            onPointerOut={() => {
-              if (isInInterior) return;
-              document.body.style.cursor = 'auto';
-            }}
-          >
-            {Array.from({ length: extrudeLayers }, (_, i) => {
-              const isTop = i === extrudeLayers - 1;
-              const layerY = (extrudeHeight * (i + 1)) / extrudeLayers;
-              return (
-                <mesh key={i} position={[0, layerY, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-                  <planeGeometry args={[size, size]} />
-                  <meshBasicMaterial
-                    map={isTop ? topTex : sideTex}
-                    transparent
-                    alphaTest={0.28}
-                    toneMapped={false}
-                  />
-                </mesh>
-              );
-            })}
           </group>
         );
       })}
@@ -879,12 +914,11 @@ function SplineAtriumBodyGraph({
         }}
       />
 
-      {/* 中心表面正擺立體黑體閘門數字（有定義突出中心表面；無定義緊貼表面不突出） */}
+      {/* 中心表面平面正擺黑體閘門數字（支援前端開啟拖曳模式微調並寫回 JSON） */}
       <BodyGraphGateNumbers3D
         gatePositions={gatePositions}
         centerPositions={centerPositions}
         centerTopYs={centerTopYs}
-        activeGates={activeGates}
         isInInterior={isInInterior}
         onSelectGate={(gateNum, pos) => onSelectGate(gateNum, toWorldTuple(pos))}
       />

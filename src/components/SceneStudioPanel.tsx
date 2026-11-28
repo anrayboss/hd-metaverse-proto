@@ -125,7 +125,7 @@ const PALETTE_KEYS = [
 ] as const;
 
 type PaletteKey = (typeof PALETTE_KEYS)[number];
-type StudioNumericKey = Exclude<keyof SceneConfig, PaletteKey>;
+type StudioNumericKey = Exclude<keyof SceneConfig, PaletteKey | 'gateDigitOffsets'>;
 
 interface ParamSpec {
   min: number;
@@ -252,6 +252,7 @@ export function SceneStudioPanel() {
   const exitInteriorSpace = useWorldStore((s) => s.exitInteriorSpace);
   const setConfig = useSceneConfigStore((s) => s.setConfig);
   const setShowRuler = useSceneConfigStore((s) => s.setShowRuler);
+  const setEditGateDigits = useSceneConfigStore((s) => s.setEditGateDigits);
   const hoveredRuler = useSceneConfigStore((s) => s.hoveredRuler);
   const saveToLocalFile = useSceneConfigStore((s) => s.saveToLocalFile);
   const saveStatus = useSceneConfigStore((s) => s.saveStatus);
@@ -269,6 +270,7 @@ export function SceneStudioPanel() {
   const [studioValues, setStudio] = useControls(
     () => ({
       showRuler: { value: false, label: '📏 顯示尺規 (懸停長寬高)' },
+      editGateDigits: { value: false, label: '✋ 拖曳調整閘門數字位置' },
       '介面字體': folder(
         {
           studioFontSize: numCtrl('studioFontSize'),
@@ -379,10 +381,12 @@ export function SceneStudioPanel() {
         void saveToLocalFile();
       }),
       '↩️ 重設回已儲存數值': button(() => {
-        const savedStudio = pickStudioValues(useSceneConfigStore.getState().savedConfig);
-        setStudio({ ...savedStudio, showRuler: false });
-        setConfig(savedStudio);
+        const saved = useSceneConfigStore.getState().savedConfig;
+        const savedStudio = pickStudioValues(saved);
+        setStudio({ ...savedStudio, showRuler: false, editGateDigits: false });
+        setConfig({ ...savedStudio, gateDigitOffsets: { ...saved.gateDigitOffsets } });
         setShowRuler(false);
+        setEditGateDigits(false);
         useSceneConfigStore.setState({ saveStatus: '↩️ 已重設回已儲存數值' });
         setTimeout(() => useSceneConfigStore.setState({ saveStatus: '' }), 2200);
       }),
@@ -404,8 +408,8 @@ export function SceneStudioPanel() {
           colorCircleUndefined: { value: DEFAULT_SCENE_CONFIG.colorCircleUndefined, label: '2D 空白閘門圈' },
           colorChannelActive: { value: DEFAULT_SCENE_CONFIG.colorChannelActive, label: '3D 啟動通道色' },
           colorChannelInactive: { value: DEFAULT_SCENE_CONFIG.colorChannelInactive, label: '3D 空白通道色' },
-          colorBodyGraphGateDefined: { value: DEFAULT_SCENE_CONFIG.colorBodyGraphGateDefined, label: '3D 定義閘門數字色' },
-          colorBodyGraphGateUndefined: { value: DEFAULT_SCENE_CONFIG.colorBodyGraphGateUndefined, label: '3D 無定義閘門數字色' },
+          colorBodyGraphGateDefined: { value: DEFAULT_SCENE_CONFIG.colorBodyGraphGateDefined, label: '3D 定義閘門數字色 (備用)' },
+          colorBodyGraphGateUndefined: { value: DEFAULT_SCENE_CONFIG.colorBodyGraphGateUndefined, label: '3D 人體圖閘門數字色' },
         },
         { collapsed: false }
       ),
@@ -447,7 +451,7 @@ export function SceneStudioPanel() {
   );
 
   useEffect(() => {
-    const { showRuler, ...sceneValues } = studioValues;
+    const { showRuler, editGateDigits, ...sceneValues } = studioValues;
     // 安全 clamp，避免手動鍵盤輸入或拖曳超出合理區間
     const clamped: Partial<SceneConfig> = {};
     for (const k of STUDIO_NUMERIC_KEYS) {
@@ -459,7 +463,8 @@ export function SceneStudioPanel() {
     }
     setConfig(clamped);
     setShowRuler(showRuler);
-  }, [studioValues, setConfig, setShowRuler]);
+    setEditGateDigits(editGateDigits);
+  }, [studioValues, setConfig, setShowRuler, setEditGateDigits]);
 
   useEffect(() => {
     setConfig(paletteValues);

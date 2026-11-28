@@ -50,6 +50,7 @@ export function CameraRig() {
   const corridorRadius = useWorldStore((s) => s.corridorRadius);
   const corridorDirection = useWorldStore((s) => s.corridorDirection);
   const config = useSceneConfigStore((s) => s.config);
+  const isDraggingGateDigit = useSceneConfigStore((s) => s.isDraggingGateDigit);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -632,6 +633,7 @@ export function CameraRig() {
   return (
     <OrbitControls
       ref={controlsRef}
+      enabled={!isDraggingGateDigit}
       enableDamping
       dampingFactor={0.07}
       enableRotate

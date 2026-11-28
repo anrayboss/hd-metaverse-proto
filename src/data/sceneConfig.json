@@ -84,5 +84,6 @@
   "colorQuadInitiation": "#a6342a",
   "colorQuadCivilization": "#3f7337",
   "colorQuadDuality": "#a35d1e",
-  "colorQuadMutation": "#24486b"
+  "colorQuadMutation": "#24486b",
+  "gateDigitOffsets": {}
 }

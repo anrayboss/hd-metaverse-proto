@@ -97,6 +97,8 @@ export interface SceneConfig {
   colorQuadCivilization: string;
   colorQuadDuality: string;
   colorQuadMutation: string;
+  // 3D 人體圖閘門數字自訂水平偏移 [dx, dz]（可於前端滑鼠拖曳調整並寫回 JSON）
+  gateDigitOffsets: Record<string, [number, number]>;
 }
 
 export interface HoveredRulerInfo {
@@ -111,21 +113,33 @@ interface SceneConfigState {
   savedConfig: SceneConfig;
   showRuler: boolean;
   hoveredRuler: HoveredRulerInfo | null;
+  editGateDigits: boolean;
+  isDraggingGateDigit: boolean;
   saveStatus: string;
   setConfig: (partial: Partial<SceneConfig>) => void;
   setShowRuler: (show: boolean) => void;
   setHoveredRuler: (info: HoveredRulerInfo | null) => void;
+  setEditGateDigits: (enabled: boolean) => void;
+  setIsDraggingGateDigit: (dragging: boolean) => void;
+  setGateDigitOffset: (gateNum: number, dx: number, dz: number) => void;
+  resetGateDigitOffsets: () => void;
   resetConfig: () => void;
   saveToLocalFile: () => Promise<void>;
 }
 
-export const DEFAULT_SCENE_CONFIG: SceneConfig = { ...initialConfig };
+const rawInitial = initialConfig as Partial<SceneConfig>;
+export const DEFAULT_SCENE_CONFIG: SceneConfig = {
+  ...(rawInitial as SceneConfig),
+  gateDigitOffsets: { ...(rawInitial.gateDigitOffsets ?? {}) },
+};
 
 export const useSceneConfigStore = create<SceneConfigState>((set, get) => ({
-  config: { ...DEFAULT_SCENE_CONFIG },
-  savedConfig: { ...DEFAULT_SCENE_CONFIG },
+  config: { ...DEFAULT_SCENE_CONFIG, gateDigitOffsets: { ...DEFAULT_SCENE_CONFIG.gateDigitOffsets } },
+  savedConfig: { ...DEFAULT_SCENE_CONFIG, gateDigitOffsets: { ...DEFAULT_SCENE_CONFIG.gateDigitOffsets } },
   showRuler: false,
   hoveredRuler: null,
+  editGateDigits: false,
+  isDraggingGateDigit: false,
   saveStatus: '',
 
   setConfig: (partial) =>
@@ -137,22 +151,56 @@ export const useSceneConfigStore = create<SceneConfigState>((set, get) => ({
 
   setHoveredRuler: (hoveredRuler) => set({ hoveredRuler }),
 
+  setEditGateDigits: (editGateDigits) =>
+    set({ editGateDigits, isDraggingGateDigit: editGateDigits ? get().isDraggingGateDigit : false }),
+
+  setIsDraggingGateDigit: (isDraggingGateDigit) => set({ isDraggingGateDigit }),
+
+  setGateDigitOffset: (gateNum, dx, dz) =>
+    set((state) => ({
+      config: {
+        ...state.config,
+        gateDigitOffsets: {
+          ...state.config.gateDigitOffsets,
+          [String(gateNum)]: [Number(dx.toFixed(3)), Number(dz.toFixed(3))],
+        },
+      },
+    })),
+
+  resetGateDigitOffsets: () =>
+    set((state) => ({
+      config: {
+        ...state.config,
+        gateDigitOffsets: {},
+      },
+      saveStatus: '↩️ 已清除全部閘門數字手動偏移',
+    })),
+
   resetConfig: () =>
     set((state) => ({
-      config: { ...state.savedConfig },
+      config: {
+        ...state.savedConfig,
+        gateDigitOffsets: { ...state.savedConfig.gateDigitOffsets },
+      },
       saveStatus: '已還原至已儲存數值',
     })),
 
   saveToLocalFile: async () => {
     try {
-      const current = { ...get().config };
+      const current: SceneConfig = {
+        ...get().config,
+        gateDigitOffsets: { ...get().config.gateDigitOffsets },
+      };
       const res = await fetch('/__save-scene-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(current),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      set({ savedConfig: current, saveStatus: '✅ 已寫回 src/data/sceneConfig.json' });
+      set({
+        savedConfig: { ...current, gateDigitOffsets: { ...current.gateDigitOffsets } },
+        saveStatus: '✅ 已寫回 src/data/sceneConfig.json',
+      });
     } catch {
       set({ saveStatus: '⚠️ 僅限本機 npm run dev 模式寫檔' });
     }
