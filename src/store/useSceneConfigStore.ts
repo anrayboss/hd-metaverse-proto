@@ -63,10 +63,9 @@ export interface SceneConfig {
   idleOrbitSpeed: number;
   idleVerticalSpeed: number;
   idleVerticalAmp: number;
-  idleCameraDistFree: number;
-  idleCameraDistCorridor: number;
-  idleCameraDistInterior: number;
-  idleZoomAmp: number;
+  idleCameraDistMin: number;
+  idleCameraDistMax: number;
+  idleZoomSpeed: number;
   // 介面字體尺寸
   studioFontSize: number;
   chartPanelFontSize: number;

@@ -202,10 +202,9 @@ const STUDIO_PARAM_SPECS: Record<StudioNumericKey, ParamSpec> = {
   idleOrbitSpeed: { min: 0.02, max: 1.0, step: 0.02, label: '水平旋轉速度' },
   idleVerticalSpeed: { min: 0, max: 1.0, step: 0.02, label: '垂直起伏速度' },
   idleVerticalAmp: { min: 0, max: 0.6, step: 0.02, label: '垂直起伏幅度' },
-  idleCameraDistFree: { min: 2, max: 30, step: 0.2, label: '外部距金探子距離' },
-  idleCameraDistCorridor: { min: 1.5, max: 16, step: 0.2, label: '走廊距金探子距離' },
-  idleCameraDistInterior: { min: 1.5, max: 12, step: 0.2, label: '室內距金探子距離' },
-  idleZoomAmp: { min: 0, max: 0.45, step: 0.02, label: '景深呼吸推拉幅度' },
+  idleCameraDistMin: { min: 1.5, max: 40, step: 0.2, label: '最近距離下限 (m)' },
+  idleCameraDistMax: { min: 2.0, max: 80, step: 0.5, label: '最遠距離上限 (m)' },
+  idleZoomSpeed: { min: 0, max: 1.0, step: 0.02, label: '距離推拉速度' },
 };
 
 const STUDIO_NUMERIC_KEYS = Object.keys(STUDIO_PARAM_SPECS) as StudioNumericKey[];
@@ -361,10 +360,9 @@ export function SceneStudioPanel() {
           idleOrbitSpeed: numCtrl('idleOrbitSpeed'),
           idleVerticalSpeed: numCtrl('idleVerticalSpeed'),
           idleVerticalAmp: numCtrl('idleVerticalAmp'),
-          idleCameraDistFree: numCtrl('idleCameraDistFree'),
-          idleCameraDistCorridor: numCtrl('idleCameraDistCorridor'),
-          idleCameraDistInterior: numCtrl('idleCameraDistInterior'),
-          idleZoomAmp: numCtrl('idleZoomAmp'),
+          idleCameraDistMin: numCtrl('idleCameraDistMin'),
+          idleCameraDistMax: numCtrl('idleCameraDistMax'),
+          idleZoomSpeed: numCtrl('idleZoomSpeed'),
         },
         { collapsed: true }
       ),

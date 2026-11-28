@@ -216,15 +216,7 @@ export function CameraRig() {
       orbit.elapsed += delta;
       const t = orbit.elapsed;
 
-      // 依當前空間動態採用調參面板設定的距離
-      const baseRadius =
-        currentMode === 'interior'
-          ? config.idleCameraDistInterior
-          : currentMode === 'corridor'
-            ? config.idleCameraDistCorridor
-            : config.idleCameraDistFree;
-
-      // 水平緩慢公轉（帶微妙速度起伏）＋ 垂直多頻波起伏 ＋ 緩慢推拉景深
+      // 水平緩慢公轉（帶微妙速度起伏）＋ 垂直雙諧波起伏 ＋ 距離在 [min, max] 間有機呼吸推拉
       const azimuthSpeed =
         config.idleOrbitSpeed * (1 + Math.sin(t * 0.19) * 0.25) * orbit.azimuthDir;
       orbit.azimuth += azimuthSpeed * delta;
@@ -238,7 +230,14 @@ export function CameraRig() {
         0.44,
         1.44
       );
-      const targetRadius = baseRadius * (1 + Math.sin(t * 0.17 + 0.6) * config.idleZoomAmp);
+
+      const minDist = Math.min(config.idleCameraDistMin, config.idleCameraDistMax);
+      const maxDist = Math.max(config.idleCameraDistMin, config.idleCameraDistMax);
+      const zSpeed = config.idleZoomSpeed;
+      // 雙頻平滑波（0..1），避免死板往復，營造自然電影推拉節奏
+      const zoomWave =
+        0.5 + 0.36 * Math.sin(t * zSpeed + 0.4) + 0.14 * Math.sin(t * zSpeed * 0.43 + 1.9);
+      const targetRadius = THREE.MathUtils.lerp(minDist, maxDist, THREE.MathUtils.clamp(zoomWave, 0, 1));
 
       const sinP = Math.sin(targetPolar);
       desiredCamVec.set(
