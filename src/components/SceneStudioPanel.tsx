@@ -107,6 +107,8 @@ const PALETTE_KEYS = [
   'colorCircleUndefined',
   'colorChannelActive',
   'colorChannelInactive',
+  'colorBodyGraphGateDefined',
+  'colorBodyGraphGateUndefined',
   'colorCenterHead',
   'colorCenterAjna',
   'colorCenterThroat',
@@ -164,6 +166,8 @@ const STUDIO_PARAM_SPECS: Record<StudioNumericKey, ParamSpec> = {
   centerEmissiveDefined: { min: 0, max: 1.5, step: 0.02, label: '定義中心發光' },
   centerInteriorOpacity: { min: 0.15, max: 1, step: 0.02, label: '室內牆透明度' },
   centerInteriorLight: { min: 0, max: 12, step: 0.2, label: '室內點光強度' },
+  bodyGraphGateNumSize: { min: 0.35, max: 2.0, step: 0.04, label: '閘門數字大小' },
+  bodyGraphGateExtrude: { min: 0.04, max: 0.8, step: 0.02, label: '定義閘門突出高度' },
   // 通道管線與匯流點
   channelRadius: { min: 0.06, max: 0.8, step: 0.01, label: '一般通道管徑' },
   channelActiveRadius: { min: 0.08, max: 1.0, step: 0.01, label: '定義通道管徑' },
@@ -298,6 +302,8 @@ export function SceneStudioPanel() {
           centerEmissiveDefined: numCtrl('centerEmissiveDefined'),
           centerInteriorOpacity: numCtrl('centerInteriorOpacity'),
           centerInteriorLight: numCtrl('centerInteriorLight'),
+          bodyGraphGateNumSize: numCtrl('bodyGraphGateNumSize'),
+          bodyGraphGateExtrude: numCtrl('bodyGraphGateExtrude'),
         },
         { collapsed: true }
       ),
@@ -395,6 +401,8 @@ export function SceneStudioPanel() {
           colorCircleUndefined: { value: DEFAULT_SCENE_CONFIG.colorCircleUndefined, label: '2D 空白閘門圈' },
           colorChannelActive: { value: DEFAULT_SCENE_CONFIG.colorChannelActive, label: '3D 啟動通道色' },
           colorChannelInactive: { value: DEFAULT_SCENE_CONFIG.colorChannelInactive, label: '3D 空白通道色' },
+          colorBodyGraphGateDefined: { value: DEFAULT_SCENE_CONFIG.colorBodyGraphGateDefined, label: '3D 定義閘門數字色' },
+          colorBodyGraphGateUndefined: { value: DEFAULT_SCENE_CONFIG.colorBodyGraphGateUndefined, label: '3D 無定義閘門數字色' },
         },
         { collapsed: false }
       ),

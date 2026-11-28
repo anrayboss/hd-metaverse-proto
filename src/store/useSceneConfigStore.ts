@@ -32,6 +32,8 @@ export interface SceneConfig {
   centerEmissiveDefined: number;
   centerInteriorOpacity: number;
   centerInteriorLight: number;
+  bodyGraphGateNumSize: number;
+  bodyGraphGateExtrude: number;
   // 通道管線與匯流點
   channelRadius: number;
   channelActiveRadius: number;
@@ -80,6 +82,8 @@ export interface SceneConfig {
   colorCircleUndefined: string;
   colorChannelActive: string;
   colorChannelInactive: string;
+  colorBodyGraphGateDefined: string;
+  colorBodyGraphGateUndefined: string;
   colorCenterHead: string;
   colorCenterAjna: string;
   colorCenterThroat: string;

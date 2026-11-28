@@ -386,6 +386,181 @@ function VariableArrows3D({
   );
 }
 
+/** 建立單一閘門黑體數字 CanvasTexture（正擺於中心頂面，不跟隨鏡頭） */
+function createGateDigitTexture(gateNum: number, color: string): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = color;
+    ctx.font =
+      '900 82px "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", "Heiti TC", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(gateNum), canvas.width / 2, canvas.height / 2 + 4);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+/** 計算立體浮雕側面較暗色，讓突出表面的黑體數字呈現清晰厚度感 */
+function darkenHexColor(hex: string, factor = 0.55): string {
+  const c = new THREE.Color(hex);
+  c.multiplyScalar(factor);
+  return `#${c.getHexString()}`;
+}
+
+/**
+ * 3D 人體圖中心表面立體閘門數字：
+ * - 採用原閘門方塊的水平 (x, z) 座標，正擺於所屬中心頂面（不跟隨鏡頭）
+ * - 有定義閘門：多層立體擠出突出中心表面，顏色可由調色盤指定
+ * - 無定義閘門：單層緊貼中心表面不突出
+ */
+function BodyGraphGateNumbers3D({
+  gatePositions,
+  centerTopYs,
+  activeGates,
+  isInInterior,
+  onSelectGate,
+}: {
+  gatePositions: Record<number, THREE.Vector3>;
+  centerTopYs: Partial<Record<CenterId, number>>;
+  activeGates: number[];
+  isInInterior: boolean;
+  onSelectGate: (gateNum: number, pos: THREE.Vector3) => void;
+}) {
+  const config = useSceneConfigStore((s) => s.config);
+  const activeSet = useMemo(() => new Set(activeGates), [activeGates]);
+  const gateEntries = useMemo(
+    () =>
+      Object.entries(gatePositions)
+        .map(([k, pos]) => ({ gateNum: Number(k), pos }))
+        .filter((item) => Number.isFinite(item.gateNum)),
+    [gatePositions]
+  );
+
+  const sideColor = useMemo(
+    () => darkenHexColor(config.colorBodyGraphGateDefined, 0.52),
+    [config.colorBodyGraphGateDefined]
+  );
+
+  const textures = useMemo(() => {
+    const defTop = new Map<number, THREE.CanvasTexture>();
+    const defSide = new Map<number, THREE.CanvasTexture>();
+    const undef = new Map<number, THREE.CanvasTexture>();
+    for (const { gateNum } of gateEntries) {
+      defTop.set(gateNum, createGateDigitTexture(gateNum, config.colorBodyGraphGateDefined));
+      defSide.set(gateNum, createGateDigitTexture(gateNum, sideColor));
+      undef.set(gateNum, createGateDigitTexture(gateNum, config.colorBodyGraphGateUndefined));
+    }
+    return { defTop, defSide, undef };
+  }, [
+    gateEntries,
+    config.colorBodyGraphGateDefined,
+    config.colorBodyGraphGateUndefined,
+    sideColor,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      textures.defTop.forEach((t) => t.dispose());
+      textures.defSide.forEach((t) => t.dispose());
+      textures.undef.forEach((t) => t.dispose());
+    };
+  }, [textures]);
+
+  const extrudeLayers = 6;
+  const extrudeHeight = Math.max(0.02, config.bodyGraphGateExtrude);
+  const size = config.bodyGraphGateNumSize;
+
+  return (
+    <group name="BodyGraphGateNumbers3D">
+      {gateEntries.map(({ gateNum, pos }) => {
+        const info = GATE_BY_NUMBER[gateNum];
+        const surfaceY = (info ? centerTopYs[info.centerId] : undefined) ?? pos.y;
+        const isActive = activeSet.has(gateNum);
+
+        if (!isActive) {
+          const tex = textures.undef.get(gateNum);
+          if (!tex) return null;
+          return (
+            <mesh
+              key={gateNum}
+              name={`GateDigit_${gateNum}`}
+              position={[pos.x, surfaceY + 0.012, pos.z]}
+              rotation={[-Math.PI / 2, 0, 0]}
+              onClick={(e) => {
+                if (isInInterior) return;
+                e.stopPropagation();
+                onSelectGate(gateNum, pos);
+              }}
+              onPointerOver={(e) => {
+                if (isInInterior) return;
+                e.stopPropagation();
+                document.body.style.cursor = 'pointer';
+              }}
+              onPointerOut={() => {
+                if (isInInterior) return;
+                document.body.style.cursor = 'auto';
+              }}
+            >
+              <planeGeometry args={[size, size]} />
+              <meshBasicMaterial map={tex} transparent depthWrite={false} toneMapped={false} />
+            </mesh>
+          );
+        }
+
+        const topTex = textures.defTop.get(gateNum);
+        const sideTex = textures.defSide.get(gateNum);
+        if (!topTex || !sideTex) return null;
+
+        return (
+          <group
+            key={gateNum}
+            name={`GateDigit_${gateNum}_Defined`}
+            position={[pos.x, surfaceY + 0.012, pos.z]}
+            onClick={(e) => {
+              if (isInInterior) return;
+              e.stopPropagation();
+              onSelectGate(gateNum, pos);
+            }}
+            onPointerOver={(e) => {
+              if (isInInterior) return;
+              e.stopPropagation();
+              document.body.style.cursor = 'pointer';
+            }}
+            onPointerOut={() => {
+              if (isInInterior) return;
+              document.body.style.cursor = 'auto';
+            }}
+          >
+            {Array.from({ length: extrudeLayers }, (_, i) => {
+              const isTop = i === extrudeLayers - 1;
+              const layerY = (extrudeHeight * (i + 1)) / extrudeLayers;
+              return (
+                <mesh key={i} position={[0, layerY, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                  <planeGeometry args={[size, size]} />
+                  <meshBasicMaterial
+                    map={isTop ? topTex : sideTex}
+                    transparent
+                    alphaTest={0.28}
+                    toneMapped={false}
+                  />
+                </mesh>
+              );
+            })}
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
 /**
  * 讀取 Spline 匯出的 bodygraph.glb：
  * 1. 自動置中與等比縮放至中庭圓盤
@@ -432,7 +607,7 @@ function SplineAtriumBodyGraph({
   const config = useSceneConfigStore((s) => s.config);
   const centerMap = useMemo(() => Object.fromEntries(CENTERS.map((c) => [c.id, c])), []);
 
-  const { modelRoot, gatePositions, centerPositions } = useMemo(() => {
+  const { modelRoot, gatePositions, centerPositions, centerTopYs } = useMemo(() => {
     const cloned = scene.clone(true);
     cloned.updateMatrixWorld(true);
 
@@ -458,6 +633,7 @@ function SplineAtriumBodyGraph({
 
     const gates: Record<number, THREE.Vector3> = {};
     const centers: Partial<Record<CenterId, THREE.Vector3>> = {};
+    const topYs: Partial<Record<CenterId, number>> = {};
 
     cloned.traverse((obj) => {
       const mesh = obj as THREE.Mesh;
@@ -478,6 +654,7 @@ function SplineAtriumBodyGraph({
         const pos = new THREE.Vector3();
         box.getCenter(pos);
         centers[centerId] = pos;
+        topYs[centerId] = box.max.y;
         return;
       }
 
@@ -489,38 +666,15 @@ function SplineAtriumBodyGraph({
         const pos = new THREE.Vector3();
         box.getCenter(pos);
         gates[gateNum] = pos;
+        // 閘門定位方塊僅用於拉通道與取得水平座標，渲染時隱藏改由中心頂面立體數字呈現
+        mesh.visible = false;
       }
     });
 
-    return { modelRoot: wrapper, gatePositions: gates, centerPositions: centers };
+    return { modelRoot: wrapper, gatePositions: gates, centerPositions: centers, centerTopYs: topYs };
   }, [scene]);
 
-  const centerColorMap: Record<CenterId, string> = useMemo(
-    () => ({
-      head: config.colorCenterHead,
-      ajna: config.colorCenterAjna,
-      throat: config.colorCenterThroat,
-      g: config.colorCenterG,
-      ego: config.colorCenterEgo,
-      solar: config.colorCenterSolar,
-      spleen: config.colorCenterSpleen,
-      sacral: config.colorCenterSacral,
-      root: config.colorCenterRoot,
-    }),
-    [
-      config.colorCenterHead,
-      config.colorCenterAjna,
-      config.colorCenterThroat,
-      config.colorCenterG,
-      config.colorCenterEgo,
-      config.colorCenterSolar,
-      config.colorCenterSpleen,
-      config.colorCenterSacral,
-      config.colorCenterRoot,
-    ]
-  );
-
-  // 依據定義中心與啟動閘門即時更新 GLB 材質顏色
+  // 依據定義中心與啟動閘門即時更新 GLB 材質顏色（定義中心統一用 #f2ba79 / colorDesign，無定義用純白）
   useEffect(() => {
     modelRoot.traverse((obj) => {
       const mesh = obj as THREE.Mesh;
@@ -530,15 +684,15 @@ function SplineAtriumBodyGraph({
 
       const centerId = mesh.userData.centerId as CenterId | undefined;
       if (centerId) {
-        const cColor = centerColorMap[centerId];
         const isDef = definedCenters.includes(centerId);
-        mat.color.set(isDef ? cColor : isLight ? config.colorFloorLight : '#1e293b');
-        mat.emissive.set(isDef ? cColor : '#64748b');
+        const defColor = config.colorDesign;
+        mat.color.set(isDef ? defColor : '#ffffff');
+        mat.emissive.set(isDef ? defColor : '#ffffff');
         mat.emissiveIntensity = isInInterior
           ? config.centerEmissiveDefined * 1.35
           : isDef
             ? config.centerEmissiveDefined
-            : 0.05;
+            : 0.04;
         mat.roughness = 0.45;
         // 雙面渲染：進入人體圖內部時全部九中心皆呈留空內壁，方便從中心直接走進通道、反之亦然
         mat.side = THREE.DoubleSide;
@@ -547,26 +701,14 @@ function SplineAtriumBodyGraph({
         mat.needsUpdate = true;
         return;
       }
-
-      const gateNum = mesh.userData.gateNumber as number | undefined;
-      if (gateNum !== undefined) {
-        const isActive = activeGates.includes(gateNum);
-        mat.color.set(isActive ? config.colorChannelActive : isLight ? '#e2e8f0' : '#475569');
-        mat.emissive.set(isActive ? config.colorChannelActive : '#334155');
-        mat.emissiveIntensity = isActive ? 0.7 : 0.1;
-      }
     });
   }, [
     modelRoot,
     definedCenters,
-    activeGates,
-    isLight,
-    centerColorMap,
     isInInterior,
+    config.colorDesign,
     config.centerEmissiveDefined,
     config.centerInteriorOpacity,
-    config.colorFloorLight,
-    config.colorChannelActive,
   ]);
 
   // 排除 5 條整合迴路分支（改由 34、10 接到 57-20 主幹線的匯流點）
@@ -707,6 +849,15 @@ function SplineAtriumBodyGraph({
         }}
       />
 
+      {/* 中心表面正擺立體黑體閘門數字（有定義突出中心表面；無定義緊貼表面不突出） */}
+      <BodyGraphGateNumbers3D
+        gatePositions={gatePositions}
+        centerTopYs={centerTopYs}
+        activeGates={activeGates}
+        isInInterior={isInInterior}
+        onSelectGate={(gateNum, pos) => onSelectGate(gateNum, toWorldTuple(pos))}
+      />
+
       {/* 當攝影機位於人體圖內部空間時，提供柔光照明看清九中心與通道連通內室 */}
       {isInInterior && (
         <pointLight
@@ -781,8 +932,8 @@ function SplineAtriumBodyGraph({
           <mesh position={br.end}>
             <sphereGeometry args={[config.junctionSphereRadius, 14, 14]} />
             <meshStandardMaterial
-              color={br.activeA ? '#f59e0b' : isLight ? '#cbd5e1' : '#475569'}
-              emissive={br.activeA ? '#f59e0b' : '#0f172a'}
+              color={br.activeA ? config.colorChannelActive : isLight ? config.colorChannelInactive : '#475569'}
+              emissive={br.activeA ? config.colorChannelActive : '#0f172a'}
               emissiveIntensity={br.activeA ? 0.65 : 0.1}
               side={THREE.DoubleSide}
               transparent={isInInterior}
