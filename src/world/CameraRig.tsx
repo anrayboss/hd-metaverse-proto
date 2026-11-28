@@ -11,6 +11,31 @@ import { avatarState } from './avatarState';
 type RigMode = 'overview' | 'corridor' | 'interior' | 'free-roam';
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
 
+/**
+ * 計算鏡頭在水平 XZ 平面上的「前方 (W)」與「右方 (D)」單位向量：
+ * - 一般視角使用 camera.getWorldDirection 投影至 XZ 平面
+ * - 接近正上方俯視（polar ≈ 0，前向投影趨近零）時，改以相機本地 +Y（螢幕正上方）投影至 XZ 平面，
+ *   徹底避免退化回固定世界北向 (-Z / Gate 10-11)，讓全角度 WASD 手感 100% 連續一致
+ */
+function getCameraPlanarBasis(
+  camera: THREE.Camera,
+  forwardOut: THREE.Vector3,
+  rightOut: THREE.Vector3
+) {
+  camera.getWorldDirection(forwardOut);
+  forwardOut.y = 0;
+  if (forwardOut.lengthSq() < 1e-4) {
+    forwardOut.set(0, 1, 0).applyQuaternion(camera.quaternion);
+    forwardOut.y = 0;
+  }
+  if (forwardOut.lengthSq() < 1e-6) {
+    forwardOut.set(0, 0, -1);
+  } else {
+    forwardOut.normalize();
+  }
+  rightOut.crossVectors(forwardOut, WORLD_UP).normalize();
+}
+
 export function CameraRig() {
   const { camera } = useThree();
   const controlsRef = useRef<OrbitControlsImpl>(null);
@@ -265,14 +290,7 @@ export function CameraRig() {
       const keys = keysPressed.current;
       const panSpeed = (keys['ShiftLeft'] || keys['ShiftRight'] ? 28 : 14) * delta;
       moveDelta.set(0, 0, 0);
-      camera.getWorldDirection(forward);
-      forward.y = 0;
-      if (forward.lengthSq() < 1e-6) {
-        forward.set(0, 0, -1);
-      } else {
-        forward.normalize();
-      }
-      right.crossVectors(forward, WORLD_UP).normalize();
+      getCameraPlanarBasis(camera, forward, right);
 
       if (keys['KeyW'] || keys['ArrowUp']) moveDelta.addScaledVector(forward, panSpeed);
       if (keys['KeyS'] || keys['ArrowDown']) moveDelta.addScaledVector(forward, -panSpeed);
@@ -330,14 +348,7 @@ export function CameraRig() {
           ? config.interiorSprintSpeed
           : config.interiorFlySpeed) * delta;
       moveDelta.set(0, 0, 0);
-      camera.getWorldDirection(forward);
-      forward.y = 0;
-      if (forward.lengthSq() < 1e-6) {
-        forward.set(0, 0, -1);
-      } else {
-        forward.normalize();
-      }
-      right.crossVectors(forward, WORLD_UP).normalize();
+      getCameraPlanarBasis(camera, forward, right);
 
       if (keys['KeyW'] || keys['ArrowUp']) moveDelta.addScaledVector(forward, speed);
       if (keys['KeyS'] || keys['ArrowDown']) moveDelta.addScaledVector(forward, -speed);
@@ -565,15 +576,7 @@ export function CameraRig() {
         ? config.freeRoamSpeed * config.freeRoamSprintMultiplier
         : config.freeRoamSpeed) * delta;
     moveDelta.set(0, 0, 0);
-
-    camera.getWorldDirection(forward);
-    forward.y = 0;
-    if (forward.lengthSq() < 1e-6) {
-      forward.set(0, 0, -1);
-    } else {
-      forward.normalize();
-    }
-    right.crossVectors(forward, WORLD_UP).normalize();
+    getCameraPlanarBasis(camera, forward, right);
 
     if (keys['KeyW'] || keys['ArrowUp']) moveDelta.addScaledVector(forward, speed);
     if (keys['KeyS'] || keys['ArrowDown']) moveDelta.addScaledVector(forward, -speed);
