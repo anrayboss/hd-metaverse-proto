@@ -50,6 +50,7 @@ export function CameraRig() {
   const corridorRadius = useWorldStore((s) => s.corridorRadius);
   const corridorDirection = useWorldStore((s) => s.corridorDirection);
   const config = useSceneConfigStore((s) => s.config);
+  const editGateDigits = useSceneConfigStore((s) => s.editGateDigits);
   const isDraggingGateDigit = useSceneConfigStore((s) => s.isDraggingGateDigit);
 
   useEffect(() => {
@@ -257,6 +258,34 @@ export function CameraRig() {
       return;
     } else if (idleOrbitRef.current.active) {
       idleOrbitRef.current.active = false;
+    }
+
+    // 0.5 閘門數字拖曳編輯模式：解除金探子跟隨、暫停旋轉，改為自由平移／縮放，退出即自動復原
+    if (editGateDigits) {
+      const keys = keysPressed.current;
+      const panSpeed = (keys['ShiftLeft'] || keys['ShiftRight'] ? 28 : 14) * delta;
+      moveDelta.set(0, 0, 0);
+      camera.getWorldDirection(forward);
+      forward.y = 0;
+      if (forward.lengthSq() < 1e-6) {
+        forward.set(0, 0, -1);
+      } else {
+        forward.normalize();
+      }
+      right.crossVectors(forward, WORLD_UP).normalize();
+
+      if (keys['KeyW'] || keys['ArrowUp']) moveDelta.addScaledVector(forward, panSpeed);
+      if (keys['KeyS'] || keys['ArrowDown']) moveDelta.addScaledVector(forward, -panSpeed);
+      if (keys['KeyD'] || keys['ArrowRight']) moveDelta.addScaledVector(right, panSpeed);
+      if (keys['KeyA'] || keys['ArrowLeft']) moveDelta.addScaledVector(right, -panSpeed);
+
+      if (moveDelta.lengthSq() > 0) {
+        camera.position.add(moveDelta);
+        controls.target.add(moveDelta);
+      }
+      if (camera.position.y < minCamY) camera.position.y = minCamY;
+      controls.update();
+      return;
     }
 
     // 1. 人體圖內部自由探索（全第三人稱：controls.target 永遠綁定在 avatarState.position）
@@ -636,9 +665,10 @@ export function CameraRig() {
       enabled={!isDraggingGateDigit}
       enableDamping
       dampingFactor={0.07}
-      enableRotate
-      enablePan={stage === 'free-roam' || inInterior}
+      enableRotate={!editGateDigits}
+      enablePan={editGateDigits || stage === 'free-roam' || inInterior}
       enableZoom={
+        editGateDigits ||
         stage === 'free-roam' ||
         stage === 'bodygraph' ||
         stage === 'intro' ||

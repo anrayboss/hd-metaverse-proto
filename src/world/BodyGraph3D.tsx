@@ -83,6 +83,7 @@ function ChannelConduit({
 }) {
   const pulseRef = useRef<THREE.Mesh>(null);
   const config = useSceneConfigStore((s) => s.config);
+  const editGateDigits = useSceneConfigStore((s) => s.editGateDigits);
   const bothActive = activeA && activeB;
 
   const { segA, segB, dir, length, ringPositions, fullQuat, extStart } = useMemo(() => {
@@ -144,17 +145,17 @@ function ChannelConduit({
     <group
       name={`Channel_${channelId}_${channelName}`}
       onClick={(e) => {
-        if (isInInterior) return;
+        if (isInInterior || editGateDigits) return;
         e.stopPropagation();
         onSelectChannel();
       }}
       onPointerOver={(e) => {
-        if (isInInterior) return;
+        if (isInInterior || editGateDigits) return;
         e.stopPropagation();
         document.body.style.cursor = 'pointer';
       }}
       onPointerOut={() => {
-        if (isInInterior) return;
+        if (isInInterior || editGateDigits) return;
         document.body.style.cursor = 'auto';
       }}
     >
@@ -656,6 +657,7 @@ function SplineAtriumBodyGraph({
 }) {
   const { scene } = useGLTF(BODYGRAPH_GLB_URL);
   const config = useSceneConfigStore((s) => s.config);
+  const editGateDigits = useSceneConfigStore((s) => s.editGateDigits);
   const centerMap = useMemo(() => Object.fromEntries(CENTERS.map((c) => [c.id, c])), []);
 
   const { modelRoot, gatePositions, centerPositions, centerTopYs } = useMemo(() => {
@@ -861,8 +863,8 @@ function SplineAtriumBodyGraph({
   ];
 
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
-    // 進入人體圖內部空間後，不再點擊觸發物件預覽視角
-    if (isInInterior) return;
+    // 進入人體圖內部空間或閘門數字拖曳編輯模式後，暫停點擊中心／閘門預覽互動
+    if (isInInterior || editGateDigits) return;
     const target = e.object;
     const gateNum = target.userData.gateNumber as number | undefined;
     if (gateNum !== undefined) {
@@ -902,14 +904,14 @@ function SplineAtriumBodyGraph({
         object={modelRoot}
         onClick={handleClick}
         onPointerOver={(e: ThreeEvent<PointerEvent>) => {
-          if (isInInterior) return;
+          if (isInInterior || editGateDigits) return;
           if (e.object.userData.centerId || e.object.userData.gateNumber) {
             e.stopPropagation();
             document.body.style.cursor = 'pointer';
           }
         }}
         onPointerOut={() => {
-          if (isInInterior) return;
+          if (isInInterior || editGateDigits) return;
           document.body.style.cursor = 'auto';
         }}
       />
