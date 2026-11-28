@@ -32,6 +32,7 @@ export interface SceneConfig {
   centerEmissiveDefined: number;
   centerInteriorOpacity: number;
   centerInteriorLight: number;
+  centerWallOutset: number;
   bodyGraphGateNumSize: number;
   bodyGraphGateExtrude: number;
   // 通道管線與匯流點

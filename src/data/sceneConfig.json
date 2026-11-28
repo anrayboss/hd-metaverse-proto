@@ -26,6 +26,7 @@
   "centerEmissiveDefined": 0.28,
   "centerInteriorOpacity": 0.72,
   "centerInteriorLight": 3.5,
+  "centerWallOutset": 0.06,
   "bodyGraphGateNumSize": 0.58,
   "bodyGraphGateExtrude": 0.22,
   "channelRadius": 0.15,

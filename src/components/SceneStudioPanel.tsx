@@ -170,6 +170,7 @@ const STUDIO_PARAM_SPECS: Record<StudioNumericKey, ParamSpec> = {
   centerEmissiveDefined: { min: 0, max: 1.5, step: 0.02, label: '定義中心發光' },
   centerInteriorOpacity: { min: 0.15, max: 1, step: 0.02, label: '室內牆透明度' },
   centerInteriorLight: { min: 0, max: 12, step: 0.2, label: '室內點光強度' },
+  centerWallOutset: { min: 0, max: 0.4, step: 0.01, label: '中心外牆延伸厚度' },
   bodyGraphGateNumSize: { min: 0.35, max: 2.0, step: 0.04, label: '閘門數字大小' },
   bodyGraphGateExtrude: { min: 0.04, max: 0.8, step: 0.02, label: '定義閘門突出高度' },
   // 通道管線與匯流點
@@ -310,6 +311,7 @@ export function SceneStudioPanel() {
           centerEmissiveDefined: numCtrl('centerEmissiveDefined'),
           centerInteriorOpacity: numCtrl('centerInteriorOpacity'),
           centerInteriorLight: numCtrl('centerInteriorLight'),
+          centerWallOutset: numCtrl('centerWallOutset'),
           bodyGraphGateNumSize: numCtrl('bodyGraphGateNumSize'),
           bodyGraphGateExtrude: numCtrl('bodyGraphGateExtrude'),
         },

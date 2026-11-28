@@ -815,6 +815,12 @@ function SplineAtriumBodyGraph({
       const centerId = CENTER_NAME_TO_ID[lower] ?? CENTER_NAME_TO_ID[parentLower];
       if (centerId) {
         mesh.userData.centerId = centerId;
+        // 複製獨立幾何並記錄原始頂點與 wrapper 空間基準，供統一調整九中心外牆延伸厚度
+        mesh.geometry = mesh.geometry.clone();
+        const posAttr = mesh.geometry.getAttribute('position') as THREE.BufferAttribute | undefined;
+        if (posAttr) {
+          mesh.userData.basePositions = new Float32Array(posAttr.array as Float32Array);
+        }
         const box = new THREE.Box3().setFromObject(mesh);
         const pos = new THREE.Vector3();
         box.getCenter(pos);
@@ -897,6 +903,54 @@ function SplineAtriumBodyGraph({
     config.centerInteriorOpacity,
   ]);
 
+  // 九中心統一向外延伸水平厚度（保持水密不裂縫、Y 軸不變，消除尖圓角與斜口管間的小縫隙）
+  useEffect(() => {
+    const outset = Math.max(0, config.centerWallOutset ?? 0);
+    modelRoot.updateMatrixWorld(true);
+    const invRootMat = modelRoot.matrixWorld.clone().invert();
+    const vWorld = new THREE.Vector3();
+    const vRoot = new THREE.Vector3();
+
+    for (const [cid, meshes] of Object.entries(centerMeshes)) {
+      const centerPos = centerPositions[cid as CenterId];
+      if (!centerPos || !meshes) continue;
+
+      for (const mesh of meshes) {
+        const baseArr = mesh.userData.basePositions as Float32Array | undefined;
+        const posAttr = mesh.geometry.getAttribute('position') as THREE.BufferAttribute | undefined;
+        if (!baseArr || !posAttr) continue;
+
+        const meshToRoot = new THREE.Matrix4().multiplyMatrices(invRootMat, mesh.matrixWorld);
+        const rootToMesh = meshToRoot.clone().invert();
+        const outArr = posAttr.array as Float32Array;
+
+        if (outset <= 1e-5) {
+          outArr.set(baseArr);
+        } else {
+          for (let i = 0; i < baseArr.length; i += 3) {
+            vRoot.set(baseArr[i], baseArr[i + 1], baseArr[i + 2]).applyMatrix4(meshToRoot);
+            const dx = vRoot.x - centerPos.x;
+            const dz = vRoot.z - centerPos.z;
+            const r = Math.hypot(dx, dz);
+            if (r > 1e-4) {
+              const s = (r + outset) / r;
+              vRoot.x = centerPos.x + dx * s;
+              vRoot.z = centerPos.z + dz * s;
+            }
+            vWorld.copy(vRoot).applyMatrix4(rootToMesh);
+            outArr[i] = vWorld.x;
+            outArr[i + 1] = vWorld.y;
+            outArr[i + 2] = vWorld.z;
+          }
+        }
+        posAttr.needsUpdate = true;
+        mesh.geometry.computeVertexNormals();
+        mesh.geometry.computeBoundingBox();
+        mesh.geometry.computeBoundingSphere();
+      }
+    }
+  }, [modelRoot, centerMeshes, centerPositions, config.centerWallOutset]);
+
   // 排除 5 條整合迴路分支（改由 34、10 接到 57-20 主幹線的匯流點）
   const standardChannels = useMemo(
     () =>
@@ -922,9 +976,18 @@ function SplineAtriumBodyGraph({
       gates: [number, number];
       start: THREE.Vector3;
       end: THREE.Vector3;
+      junctionNormal: THREE.Vector3;
       activeA: boolean;
       activeB: boolean;
     }> = [];
+
+    const mainDir = p20.clone().sub(p57).normalize();
+    const computeJunctionNormal = (fromPt: THREE.Vector3, toPt: THREE.Vector3) => {
+      const bDir = toPt.clone().sub(fromPt).normalize();
+      // 嚴格垂直於 57-20 主幹線軸線的共面法線，讓分支終點切出完全貼合主幹線外壁的斜口
+      const n = bDir.clone().addScaledVector(mainDir, -bDir.dot(mainDir));
+      return n.lengthSq() > 1e-6 ? n.normalize() : bDir;
+    };
 
     const anyMainActive = activeGates.includes(20) || activeGates.includes(57);
 
@@ -940,6 +1003,7 @@ function SplineAtriumBodyGraph({
         gates: [34, 20] as [number, number],
         start: p34,
         end: junction34,
+        junctionNormal: computeJunctionNormal(p34, junction34),
         activeA: is34Active,
         activeB: junctionLit,
       });
@@ -967,6 +1031,7 @@ function SplineAtriumBodyGraph({
         gates: [10, 57] as [number, number],
         start: p10,
         end: junction10,
+        junctionNormal: computeJunctionNormal(p10, junction10),
         activeA: is10Active,
         activeB: junctionLit,
       });
@@ -1133,7 +1198,7 @@ function SplineAtriumBodyGraph({
               start={clipS.point}
               end={br.end}
               startNormal={clipS.normal}
-              endNormal={null}
+              endNormal={br.junctionNormal}
               activeA={br.activeA}
               activeB={br.activeB}
               isLight={isLight}
