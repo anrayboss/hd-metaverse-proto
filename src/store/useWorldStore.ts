@@ -30,6 +30,9 @@ export type VariableDetailLevel = 0 | 1 | 2 | 3;
 /** 日後製作完整新手導覽（紅太陽進 → 走廊 → 人體圖 → 黑太陽出）時改為 true */
 export const ENABLE_SUN_GUIDE = false;
 
+/** 待機電影模式觸發門檻（3 分鐘無操作） */
+export const IDLE_CINEMATIC_TIMEOUT_MS = 3 * 60 * 1000;
+
 export type JourneyStage =
   | 'intro'
   | 'red-sun'
@@ -101,6 +104,7 @@ interface WorldState {
   avatarConfig: AvatarConfig;
   cameraFocusTarget: [number, number, number] | null;
   freeRoamResetTick: number;
+  isIdleCinematic: boolean;
   showReceiptModal: boolean;
   // 1/64 完整閘門走廊極座標狀態（R ∈ [23, 87]）
   activeCorridorIndex: number;
@@ -145,6 +149,7 @@ interface WorldState {
   setChannelInteriorProgress: (progress: number) => void;
   exitInteriorSpace: () => void;
   setAvatarConfig: (partial: Partial<AvatarConfig>) => void;
+  setIdleCinematic: (active: boolean) => void;
   clearSelection: () => void;
   setShowReceiptModal: (open: boolean) => void;
 }
@@ -210,6 +215,7 @@ export const useWorldStore = create<WorldState>((set, get) => ({
   },
   cameraFocusTarget: null,
   freeRoamResetTick: 0,
+  isIdleCinematic: false,
   showReceiptModal: false,
   activeCorridorIndex: initialChart.redSun.gateInfo.wheelIndex,
   corridorRadius: 85,
@@ -220,6 +226,7 @@ export const useWorldStore = create<WorldState>((set, get) => ({
   setDisplayMode: (displayMode) =>
     set((s) => ({
       displayMode,
+      isIdleCinematic: displayMode === 'universe-3d' ? s.isIdleCinematic : false,
       showChartDrawer: displayMode === 'universe-3d' ? s.showChartDrawer : true,
     })),
 
@@ -461,6 +468,9 @@ export const useWorldStore = create<WorldState>((set, get) => ({
     set((s) => ({
       avatarConfig: { ...s.avatarConfig, ...partial },
     })),
+
+  setIdleCinematic: (active) =>
+    set((s) => (s.isIdleCinematic === active ? s : { isIdleCinematic: active })),
 
   clearSelection: () => set({ selected: null, cameraFocusTarget: null }),
 

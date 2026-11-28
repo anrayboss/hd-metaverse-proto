@@ -17,8 +17,10 @@ export function PlayerAvatar() {
   const stage = useWorldStore((s) => s.stage);
   const interiorSpace = useWorldStore((s) => s.interiorSpace);
   const avatarConfig = useWorldStore((s) => s.avatarConfig);
+  const isIdleCinematic = useWorldStore((s) => s.isIdleCinematic);
 
   const visible =
+    isIdleCinematic ||
     interiorSpace !== null ||
     stage === 'free-roam' ||
     stage === 'corridor' ||

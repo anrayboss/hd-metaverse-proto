@@ -24,11 +24,27 @@ export function CameraRig() {
   const prevFreeRRef = useRef<number | null>(null);
   const corridorGlideRef = useRef(false);
   const freeRoamGlideRef = useRef(false);
+  const idleOrbitRef = useRef<{
+    active: boolean;
+    elapsed: number;
+    azimuth: number;
+    basePolar: number;
+    baseRadius: number;
+    azimuthDir: number;
+  }>({
+    active: false,
+    elapsed: 0,
+    azimuth: 0,
+    basePolar: Math.PI * 0.36,
+    baseRadius: 7.5,
+    azimuthDir: 1,
+  });
 
   const stage = useWorldStore((s) => s.stage);
   const chart = useWorldStore((s) => s.chart);
   const cameraFocusTarget = useWorldStore((s) => s.cameraFocusTarget);
   const freeRoamResetTick = useWorldStore((s) => s.freeRoamResetTick);
+  const isIdleCinematic = useWorldStore((s) => s.isIdleCinematic);
   const interiorSpace = useWorldStore((s) => s.interiorSpace);
   const activeCorridorIndex = useWorldStore((s) => s.activeCorridorIndex);
   const corridorRadius = useWorldStore((s) => s.corridorRadius);
@@ -174,6 +190,61 @@ export function CameraRig() {
 
     const minCamY = Math.max(config.avatarMinY, config.floorY + 0.1);
     const minAvatarY = config.avatarMinY;
+
+    // 0. 待機電影模式（閒置 3 分鐘）：圍繞金探子進行水平＋垂直混搭電影運鏡
+    if (isIdleCinematic) {
+      const orbit = idleOrbitRef.current;
+      if (!orbit.active) {
+        // 若停在 overview 尚未將金探子定位到畫面中心，先置於中庭上空 14m
+        if (currentMode === 'overview') {
+          avatarState.position.set(0, 14, 0);
+        }
+        const offset = desiredCamVec.subVectors(camera.position, avatarState.position);
+        const currentDist = offset.length();
+        orbit.active = true;
+        orbit.elapsed = 0;
+        orbit.azimuth = currentDist > 0.2 ? Math.atan2(offset.x, offset.z) : 0;
+        orbit.basePolar =
+          currentDist > 0.2
+            ? THREE.MathUtils.clamp(Math.acos(THREE.MathUtils.clamp(offset.y / currentDist, -1, 1)), 0.48, 1.32)
+            : 1.08;
+        orbit.baseRadius =
+          currentMode === 'interior' ? 3.8 : currentMode === 'corridor' ? 5.2 : 7.8;
+        orbit.azimuthDir = Math.random() < 0.5 ? 1 : -1;
+      }
+
+      orbit.elapsed += delta;
+      const t = orbit.elapsed;
+
+      // 水平緩慢公轉（帶微妙速度起伏）＋ 垂直多頻波起伏 ＋ 緩慢推拉景深
+      const azimuthSpeed = (0.16 + Math.sin(t * 0.19) * 0.045) * orbit.azimuthDir;
+      orbit.azimuth += azimuthSpeed * delta;
+
+      const targetPolar = THREE.MathUtils.clamp(
+        1.05 + Math.sin(t * 0.24) * 0.34 + Math.sin(t * 0.11 + 1.3) * 0.14,
+        0.46,
+        1.42
+      );
+      const targetRadius = orbit.baseRadius * (1 + Math.sin(t * 0.17 + 0.6) * 0.16);
+
+      const sinP = Math.sin(targetPolar);
+      desiredCamVec.set(
+        avatarState.position.x + Math.sin(orbit.azimuth) * sinP * targetRadius,
+        Math.max(minCamY, avatarState.position.y + Math.cos(targetPolar) * targetRadius),
+        avatarState.position.z + Math.cos(orbit.azimuth) * sinP * targetRadius
+      );
+
+      const smoothAlpha = 1 - Math.exp(-delta * 2.4);
+      camera.position.lerp(desiredCamVec, smoothAlpha);
+      if (camera.position.y < minCamY) camera.position.y = minCamY;
+      controls.target.lerp(avatarState.position, 1 - Math.exp(-delta * 4.5));
+      avatarState.velocity.multiplyScalar(0.85);
+      controls.update();
+      prevModeRef.current = currentMode;
+      return;
+    } else if (idleOrbitRef.current.active) {
+      idleOrbitRef.current.active = false;
+    }
 
     // 1. 人體圖內部自由探索（全第三人稱：controls.target 永遠綁定在 avatarState.position）
     if (currentMode === 'interior' && interiorSpace) {

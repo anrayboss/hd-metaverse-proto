@@ -1677,3 +1677,82 @@ body,
   padding: 6px 12px !important;
   font-size: 12px !important;
 }
+
+/* ===== GTA 風格待機電影模式（16:9 四周暗色遮罩＋HUD 淡出） ===== */
+.app-shell[data-idle-cinematic='true'] .hud-root,
+.app-shell[data-idle-cinematic='true'] .studio-leva-dock {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.85s ease;
+}
+
+.app-shell[data-idle-cinematic='false'] .hud-root,
+.app-shell[data-idle-cinematic='false'] .studio-leva-dock {
+  transition: opacity 0.4s ease;
+}
+
+.idle-cinematic-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.9s ease;
+}
+
+.idle-cinematic-overlay--active {
+  opacity: 1;
+}
+
+.idle-cinematic-bar {
+  position: fixed;
+  background: rgba(5, 8, 15, 0.94);
+  transition: width 0.75s cubic-bezier(0.22, 1, 0.36, 1),
+    height 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.idle-cinematic-bar--top {
+  top: 0;
+  left: 0;
+  right: 0;
+}
+
+.idle-cinematic-bar--bottom {
+  bottom: 0;
+  left: 0;
+  right: 0;
+}
+
+.idle-cinematic-bar--left {
+  top: 0;
+  bottom: 0;
+  left: 0;
+}
+
+.idle-cinematic-bar--right {
+  top: 0;
+  bottom: 0;
+  right: 0;
+}
+
+.idle-cinematic-frame {
+  position: fixed;
+  box-shadow: inset 0 0 90px rgba(0, 0, 0, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: top 0.75s cubic-bezier(0.22, 1, 0.36, 1),
+    bottom 0.75s cubic-bezier(0.22, 1, 0.36, 1),
+    left 0.75s cubic-bezier(0.22, 1, 0.36, 1),
+    right 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.idle-cinematic-caption {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: rgba(248, 250, 252, 0.52);
+  text-transform: uppercase;
+  white-space: nowrap;
+  user-select: none;
+}
