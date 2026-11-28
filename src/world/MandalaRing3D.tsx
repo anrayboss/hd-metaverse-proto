@@ -15,6 +15,132 @@ import { ENABLE_SUN_GUIDE, useWorldStore } from '../store/useWorldStore';
 import { getActivePlanetList, PLANET_SYMBOLS } from '../engine/hdCalculator';
 import { useSceneConfigStore } from '../store/useSceneConfigStore';
 
+type PlanetKey = keyof typeof PLANET_SYMBOLS;
+
+/** 輔助：將一段 XZ 平面圓弧環面（rIn..rOut, a0..a1）推入頂點與顏色陣列 */
+function pushArcRingBand(
+  positions: number[],
+  colors: number[] | null,
+  rIn: number,
+  rOut: number,
+  a0: number,
+  a1: number,
+  segments: number,
+  color?: THREE.Color
+) {
+  const step = (a1 - a0) / segments;
+  for (let i = 0; i < segments; i++) {
+    const t0 = a0 + i * step;
+    const t1 = a0 + (i + 1) * step;
+    const c0 = Math.cos(t0);
+    const s0 = Math.sin(t0);
+    const c1 = Math.cos(t1);
+    const s1 = Math.sin(t1);
+
+    const x0i = c0 * rIn;
+    const z0i = s0 * rIn;
+    const x0o = c0 * rOut;
+    const z0o = s0 * rOut;
+    const x1o = c1 * rOut;
+    const z1o = s1 * rOut;
+    const x1i = c1 * rIn;
+    const z1i = s1 * rIn;
+
+    // 兩個三角形組成一個梯形弧段
+    positions.push(
+      x0i, 0, z0i,
+      x1o, 0, z1o,
+      x0o, 0, z0o,
+      x0i, 0, z0i,
+      x1i, 0, z1i,
+      x1o, 0, z1o
+    );
+    if (colors && color) {
+      for (let v = 0; v < 6; v++) {
+        colors.push(color.r, color.g, color.b);
+      }
+    }
+  }
+}
+
+/** 輔助：將一條沿角度 angle 從 rIn 到 rOut、寬度為 width 的 XZ 扁平向量線段推入頂點陣列 */
+function pushRadialRibbon(
+  positions: number[],
+  rIn: number,
+  rOut: number,
+  angle: number,
+  width: number
+) {
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const halfW = width * 0.5;
+  // 垂直於徑向的切線單位向量 (-sin, cos)
+  const px = -sin * halfW;
+  const pz = cos * halfW;
+
+  const x0a = cos * rIn - px;
+  const z0a = sin * rIn - pz;
+  const x0b = cos * rIn + px;
+  const z0b = sin * rIn + pz;
+  const x1b = cos * rOut + px;
+  const z1b = sin * rOut + pz;
+  const x1a = cos * rOut - px;
+  const z1a = sin * rOut - pz;
+
+  positions.push(
+    x0a, 0, z0a,
+    x1b, 0, z1b,
+    x0b, 0, z0b,
+    x0a, 0, z0a,
+    x1a, 0, z1a,
+    x1b, 0, z1b
+  );
+}
+
+function buildGeometryFromArrays(positions: number[], colors?: number[] | null): THREE.BufferGeometry | null {
+  if (positions.length === 0) return null;
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  if (colors && colors.length === positions.length) {
+    geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  }
+  geom.computeBoundingSphere();
+  return geom;
+}
+
+/**
+ * 純 3D 向量地球符號（⊕）：外圓環與內部十字四端無縫連接，拉近零鋸齒
+ */
+function VectorEarthSymbol({
+  position,
+  color,
+  radius = 0.62,
+}: {
+  position: [number, number, number];
+  color: string;
+  radius?: number;
+}) {
+  const stroke = radius * 0.19;
+  const innerR = radius - stroke;
+  const barLen = radius * 2 - stroke * 0.4;
+  return (
+    <group position={position} rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh>
+        <ringGeometry args={[innerR, radius, 48]} />
+        <meshBasicMaterial color={color} side={THREE.DoubleSide} toneMapped={false} />
+      </mesh>
+      <mesh>
+        <planeGeometry args={[barLen, stroke]} />
+        <meshBasicMaterial color={color} side={THREE.DoubleSide} toneMapped={false} />
+      </mesh>
+      <mesh>
+        <planeGeometry args={[stroke, barLen]} />
+        <meshBasicMaterial color={color} side={THREE.DoubleSide} toneMapped={false} />
+      </mesh>
+    </group>
+  );
+}
+
 const BODYGRAPH_GLB_URL = '/models/bodygraph.glb';
 
 const CENTER_NAME_TO_ID: Record<string, CenterId> = {
@@ -426,25 +552,10 @@ export function MandalaRing3D() {
     return geom;
   }, [config.floorDepth, discRadius]);
 
-  // 直接繪製於地板頂面的高解析貼圖（純白底 + 各資料環之間的 6 爻小塊填色 + 放射星體符號 + 加粗閘門分隔線）
-  const floorTexture = useMemo(() => {
-    const size = 2048;
-    const half = size / 2;
-    const canvas = document.createElement('canvas');
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-
-    const rToPx = (r: number) => (r / discRadius) * half;
-
-    // 1. 3D 地板底色（淺色模式吃前端調色盤 colorFloorLight）
-    ctx.fillStyle = isLight ? config.colorFloorLight : '#0c1324';
-    ctx.fillRect(0, 0, size, size);
-
-    // 2. 統計每個 (gate, line) 的定義狀態 & 每個 gate 內的啟動星體清單（嚴格同星體列表順序）
+  // 純 3D 向量幾何底層（告別 2048px 像素模糊：定義底色、6 圈 384 爻小色塊、所有同心圓與 4/8/12/16/64 切塊分割線、放射星體清單）
+  const vectorFloor = useMemo(() => {
     const activeLines = new Map<string, { d: boolean; p: boolean }>();
-    const gatePlanets = new Map<number, Array<{ sym: string; side: 'd' | 'p' }>>();
+    const gatePlanets = new Map<number, Array<{ body: PlanetKey; sym: string; side: 'd' | 'p' }>>();
     const activePlanets = getActivePlanetList(planetToggles);
     if (chart.design && chart.personality) {
       for (const body of activePlanets) {
@@ -457,7 +568,7 @@ export function MandalaRing3D() {
             cur.d = true;
             activeLines.set(key, cur);
             const arr = gatePlanets.get(item.gate) || [];
-            arr.push({ sym, side: 'd' });
+            arr.push({ body, sym, side: 'd' });
             gatePlanets.set(item.gate, arr);
           }
         }
@@ -469,7 +580,7 @@ export function MandalaRing3D() {
             cur.p = true;
             activeLines.set(key, cur);
             const arr = gatePlanets.get(item.gate) || [];
-            arr.push({ sym, side: 'p' });
+            arr.push({ body, sym, side: 'p' });
             gatePlanets.set(item.gate, arr);
           }
         }
@@ -479,32 +590,38 @@ export function MandalaRing3D() {
     const activeSet = new Set(chart.activeGates);
     const sectorStep = (Math.PI * 2) / 64;
     const lineStep = sectorStep / 6;
-    const rInnerPx = rToPx(RING_RADII.atriumMax);
-    const rOuterPx = rToPx(RING_RADII.corridorOuter);
 
-    // 2a. 有定義閘門的柔和走廊底色（吃前端調色盤 colorActiveGateBg）
-    ctx.fillStyle = isLight ? config.colorActiveGateBg : 'rgba(252, 242, 228, 0.14)';
+    // 1. 有定義閘門柔和走廊底色（純向量扇形合併）
+    const activeBgPos: number[] = [];
     for (const g of MANDALA_GATES) {
       if (!activeSet.has(g.gate)) continue;
-      const a0 = g.angleRad - sectorStep / 2;
-      const a1 = g.angleRad + sectorStep / 2;
-      ctx.beginPath();
-      ctx.arc(half, half, rOuterPx, a0, a1, false);
-      ctx.arc(half, half, rInnerPx, a1, a0, true);
-      ctx.closePath();
-      ctx.fill();
+      pushArcRingBand(
+        activeBgPos,
+        null,
+        RING_RADII.atriumMax,
+        RING_RADII.corridorOuter,
+        g.angleRad - sectorStep / 2,
+        g.angleRad + sectorStep / 2,
+        4
+      );
     }
 
-    // 2b. 各獨立爻線小區塊薄環（獨立切出、完全不覆蓋資料層；星體圈外緣亦設爻線小色塊）
+    // 2. 6 圈獨立 6 爻小色塊（純向量頂點色合併為單一 Draw Call）
     const lineBlockBands: Array<[number, number]> = [
-      [32.5, 34.5], // 星體那圈外緣（密碼子環縮短，爻線填色移至此處）
-      [45.8, 47.8], // 獨立薄環 #1：八卦 ↔ 星座之間
-      [54.8, 56.8], // 獨立薄環 #2：星座 ↔ 神格之間
-      [63.8, 65.8], // 獨立薄環 #3：神格 ↔ 中心示意之間
-      [79.8, 81.8], // 獨立薄環 #4：阿拉伯數字 ↔ 象限之間
-      [88.8, RING_RADII.corridorOuter], // 最外圈：象限到卦象之間的 6 爻刻度細環
+      [32.5, 34.5], // 星體那圈外緣
+      [45.8, 47.8], // 八卦 ↔ 星座之間
+      [54.8, 56.8], // 星座 ↔ 神格之間
+      [63.8, 65.8], // 神格 ↔ 中心示意之間
+      [79.8, 81.8], // 阿拉伯數字 ↔ 象限之間
+      [88.8, RING_RADII.corridorOuter], // 象限 ↔ 卦象之間
     ];
 
+    const colDesign = new THREE.Color(config.colorDesign);
+    const colPersonality = new THREE.Color(isLight ? config.colorPersonality : '#e2e8f0');
+    const colBoth = new THREE.Color(config.colorBoth);
+
+    const lineBlocksPos: number[] = [];
+    const lineBlocksCol: number[] = [];
     for (const g of MANDALA_GATES) {
       const startAngle = g.angleRad + sectorStep / 2;
       for (let line = 1; line <= 6; line++) {
@@ -512,116 +629,75 @@ export function MandalaRing3D() {
         if (!st) continue;
         const aStart = startAngle - (line - 1) * lineStep;
         const aEnd = startAngle - line * lineStep;
-        ctx.fillStyle =
-          st.d && st.p
-            ? config.colorBoth
-            : st.d
-              ? config.colorDesign
-              : isLight
-                ? config.colorPersonality
-                : '#e2e8f0';
+        const color = st.d && st.p ? colBoth : st.d ? colDesign : colPersonality;
         for (const [rIn, rOut] of lineBlockBands) {
-          ctx.beginPath();
-          ctx.arc(half, half, rToPx(rOut), aEnd, aStart, false);
-          ctx.arc(half, half, rToPx(rIn), aStart, aEnd, true);
-          ctx.closePath();
-          ctx.fill();
+          pushArcRingBand(lineBlocksPos, lineBlocksCol, rIn, rOut, aEnd, aStart, 2, color);
         }
       }
     }
 
-    // 3a. 每圈爻線填色環皆繪製 384 條 6 等分爻線細刻度線（每個閘門一分為六，滿滿細節！）
-    ctx.strokeStyle = isLight ? 'rgba(100, 116, 139, 0.48)' : 'rgba(148, 163, 184, 0.32)';
-    ctx.lineWidth = 0.85;
+    // 3. 384 條 6 等分爻線細刻度（向量矩形條合併）
+    const fineTicksPos: number[] = [];
+    const fineTickW = 0.055;
     for (const [rIn, rOut] of lineBlockBands) {
-      const pIn = rToPx(rIn);
-      const pOut = rToPx(rOut);
       for (const g of MANDALA_GATES) {
         const startAngle = g.angleRad + sectorStep / 2;
         for (let line = 1; line < 6; line++) {
           const a = startAngle - line * lineStep;
-          const cos = Math.cos(a);
-          const sin = Math.sin(a);
-          ctx.beginPath();
-          ctx.moveTo(half + cos * pIn, half + sin * pIn);
-          ctx.lineTo(half + cos * pOut, half + sin * pOut);
-          ctx.stroke();
+          pushRadialRibbon(fineTicksPos, rIn, rOut, a, fineTickW);
         }
       }
     }
 
-    // 3a-2. 每圈獨立爻線環的 64 條閘門主邊界線（讓每圈爻線環也能清晰辨識閘門分界）
-    ctx.strokeStyle = isLight ? config.colorGridStroke : 'rgba(148, 163, 184, 0.48)';
-    for (const [rIn, rOut] of lineBlockBands) {
-      const pIn = rToPx(rIn);
-      const pOut = rToPx(rOut);
-      ctx.lineWidth = Math.max(1.8, config.gateDividerWidth * 0.75);
-      for (const g of MANDALA_GATES) {
-        const a = g.angleRad - sectorStep / 2;
-        const cos = Math.cos(a);
-        const sin = Math.sin(a);
-        ctx.beginPath();
-        ctx.moveTo(half + cos * pIn, half + sin * pIn);
-        ctx.lineTo(half + cos * pOut, half + sin * pOut);
-        ctx.stroke();
-      }
-    }
-
-    // 3b. 依每一層資料的實際單位數獨立繪製切塊邊框（透明底色，不讓閘門分割線貫穿內外）：
-    //     - 64 塊：星體 (22..34.5)、密碼子環 (34.5..38.8)、中心示意 (65.8..72.8)、阿拉伯數字 (72.8..79.8)、最外圈 6 爻主刻度 (88.8..92.8)
-    //     - 8 塊：八卦 (38.8..45.8)，每塊精準對齊 8 閘門（乾卦 = 1..11）
-    //     - 12 塊：星座 (47.8..54.8)，天蠍／射手對齊 14／34
-    //     - 16 塊：神格 (56.8..63.8)
-    //     - 4 塊：象限 (81.8..88.8)
+    // 4. 所有主邊界分割線（4/8/12/16/64 切塊＋14 圈同心圓，依 gateDividerWidth 換算精準向量寬度）
+    const mainLinesPos: number[] = [];
+    const pxToWorld = (px: number) => px * 0.068;
     const wheelIdxToAngle = (idx: number) => -Math.PI / 2 - ((idx - 57.5) / 64) * Math.PI * 2;
-    const drawRadialSegments = (angles: number[], rIn: number, rOut: number, lineW: number) => {
-      const pIn = rToPx(rIn);
-      const pOut = rToPx(rOut);
-      ctx.lineWidth = lineW;
+    const addRadials = (angles: number[], rIn: number, rOut: number, widthPx: number) => {
+      const w = pxToWorld(widthPx);
       for (const a of angles) {
-        const cos = Math.cos(a);
-        const sin = Math.sin(a);
-        ctx.beginPath();
-        ctx.moveTo(half + cos * pIn, half + sin * pIn);
-        ctx.lineTo(half + cos * pOut, half + sin * pOut);
-        ctx.stroke();
+        pushRadialRibbon(mainLinesPos, rIn, rOut, a, w);
       }
     };
 
-    ctx.strokeStyle = isLight ? config.colorGridStroke : 'rgba(148, 163, 184, 0.48)';
-
-    // 64 塊層（閘門分隔線寬度同步調參面板 gateDividerWidth）
     const gateAngles = MANDALA_GATES.map((g) => g.angleRad - sectorStep / 2);
-    const bands64: Array<[number, number]> = [
-      [RING_RADII.atriumMax, 34.5], // 星體圈（含外緣爻線區）
-      [34.5, 38.8], // 密碼子環（縮短）
-      [65.8, 72.8], // 中心示意環
-      [72.8, 79.8], // 阿拉伯數字環
-      [88.8, RING_RADII.corridorOuter], // 最外圈 6 爻主刻度
-    ];
-    for (const [rIn, rOut] of bands64) {
-      drawRadialSegments(gateAngles, rIn, rOut, config.gateDividerWidth);
+
+    // 6 圈爻線環的 64 條閘門主邊界線
+    for (const [rIn, rOut] of lineBlockBands) {
+      addRadials(gateAngles, rIn, rOut, Math.max(1.8, config.gateDividerWidth * 0.75));
     }
 
-    // 八卦：8 塊（乾卦從 Gate 1 (50) ~ Gate 11 (57)，邊界起於 idx = 2 - 0.5）
-    const trigramAngles = Array.from({ length: 8 }, (_, i) => wheelIdxToAngle(i * 8 + 2 - 0.5));
-    drawRadialSegments(trigramAngles, 38.8, 45.8, Math.max(2.2, config.gateDividerWidth * 0.9));
+    // 64 塊層
+    const bands64: Array<[number, number]> = [
+      [RING_RADII.atriumMax, 34.5],
+      [34.5, 38.8],
+      [65.8, 72.8],
+      [72.8, 79.8],
+      [88.8, RING_RADII.corridorOuter],
+    ];
+    for (const [rIn, rOut] of bands64) {
+      addRadials(gateAngles, rIn, rOut, config.gateDividerWidth);
+    }
 
-    // 星座：12 塊（天蠍／射手交界精準對齊 Gate 14／34 = 52.5）
+    // 八卦 8 塊（乾卦對齊 1..11）
+    const trigramAngles = Array.from({ length: 8 }, (_, i) => wheelIdxToAngle(i * 8 + 2 - 0.5));
+    addRadials(trigramAngles, 38.8, 45.8, Math.max(2.2, config.gateDividerWidth * 0.9));
+
+    // 星座 12 塊（天蠍／射手對齊 14／34）
     const zodiacAngles = Array.from({ length: 12 }, (_, i) =>
       wheelIdxToAngle(i * (64 / 12) - 5 / 6)
     );
-    drawRadialSegments(zodiacAngles, 47.8, 54.8, Math.max(2.2, config.gateDividerWidth * 0.9));
+    addRadials(zodiacAngles, 47.8, 54.8, Math.max(2.2, config.gateDividerWidth * 0.9));
 
-    // 神格：16 塊（每塊涵蓋 4 個閘門，起於 idx = 62 - 0.5）
+    // 神格 16 塊
     const godheadAngles = Array.from({ length: 16 }, (_, i) => wheelIdxToAngle(i * 4 + 62 - 0.5));
-    drawRadialSegments(godheadAngles, 56.8, 63.8, Math.max(2.0, config.gateDividerWidth * 0.85));
+    addRadials(godheadAngles, 56.8, 63.8, Math.max(2.0, config.gateDividerWidth * 0.85));
 
-    // 象限：4 塊（每塊涵蓋 16 個閘門，起於 idx = 2 - 0.5）
+    // 象限 4 塊
     const quadrantAngles = Array.from({ length: 4 }, (_, i) => wheelIdxToAngle(i * 16 + 2 - 0.5));
-    drawRadialSegments(quadrantAngles, 81.8, 88.8, Math.max(2.6, config.gateDividerWidth));
+    addRadials(quadrantAngles, 81.8, 88.8, Math.max(2.6, config.gateDividerWidth));
 
-    // 4. 各層同心圓框線（含獨立爻線小區塊環的內外邊界，不封最外圈 R=92.8 保留通透感）
+    // 14 圈同心圓框線（不封最外圈 R=92.8 保留通透感）
     const ringDefs = [
       { r: RING_RADII.atriumMax, w: 2.8 },
       { r: 32.5, w: 1.4 },
@@ -638,36 +714,49 @@ export function MandalaRing3D() {
       { r: 81.8, w: 2.2 },
       { r: 88.8, w: 2.4 },
     ];
-    ctx.strokeStyle = isLight ? config.colorGridStroke : 'rgba(148, 163, 184, 0.48)';
     for (const ring of ringDefs) {
-      ctx.lineWidth = ring.w;
-      ctx.beginPath();
-      ctx.arc(half, half, rToPx(ring.r), 0, Math.PI * 2);
-      ctx.stroke();
+      const halfW = pxToWorld(ring.w) * 0.5;
+      pushArcRingBand(mainLinesPos, null, ring.r - halfW, ring.r + halfW, 0, Math.PI * 2, 128);
     }
 
-    // 5. 3D 啟動星體符號（位於星體圈內側 23..31，依星體列表順序沿放射方向由外向內排列）
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = 'bold 24px "Noto Sans TC", "Segoe UI Symbol", sans-serif';
+    // 5. 3D 向量星體符號項目（位於星體圈內側 23..31，依星體列表順序由外向內放射排列）
+    const planetItems: Array<{
+      key: string;
+      body: PlanetKey;
+      sym: string;
+      x: number;
+      z: number;
+      color: string;
+    }> = [];
     for (const g of MANDALA_GATES) {
       const list = gatePlanets.get(g.gate);
       if (!list || list.length === 0) continue;
       list.forEach((entry, idx) => {
         const rSym = 30.8 - idx * 2.35;
         if (rSym < 22.8) return;
-        const px = half + Math.cos(g.angleRad) * rToPx(rSym);
-        const py = half + Math.sin(g.angleRad) * rToPx(rSym);
-        ctx.fillStyle = entry.side === 'd' ? config.colorDesign : isLight ? config.colorPersonality : '#f1f5f9';
-        ctx.fillText(entry.sym, px, py);
+        planetItems.push({
+          key: `${g.gate}-${entry.side}-${entry.body}-${idx}`,
+          body: entry.body,
+          sym: entry.sym,
+          x: Math.cos(g.angleRad) * rSym,
+          z: Math.sin(g.angleRad) * rSym,
+          color:
+            entry.side === 'd'
+              ? config.colorDesign
+              : isLight
+                ? config.colorPersonality
+                : '#f1f5f9',
+        });
       });
     }
 
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.anisotropy = 8;
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.needsUpdate = true;
-    return tex;
+    return {
+      activeBgGeom: buildGeometryFromArrays(activeBgPos),
+      lineBlocksGeom: buildGeometryFromArrays(lineBlocksPos, lineBlocksCol),
+      fineTicksGeom: buildGeometryFromArrays(fineTicksPos),
+      mainLinesGeom: buildGeometryFromArrays(mainLinesPos),
+      planetItems,
+    };
   }, [
     chart.activeGates,
     chart.design,
@@ -675,21 +764,20 @@ export function MandalaRing3D() {
     viewMode,
     planetToggles,
     isLight,
-    discRadius,
     config.gateDividerWidth,
-    config.colorFloorLight,
-    config.colorActiveGateBg,
     config.colorDesign,
     config.colorPersonality,
     config.colorBoth,
-    config.colorGridStroke,
   ]);
 
   useEffect(() => {
     return () => {
-      floorTexture?.dispose();
+      vectorFloor.activeBgGeom?.dispose();
+      vectorFloor.lineBlocksGeom?.dispose();
+      vectorFloor.fineTicksGeom?.dispose();
+      vectorFloor.mainLinesGeom?.dispose();
     };
-  }, [floorTexture]);
+  }, [vectorFloor]);
 
   // 十六神格、十二星座、易經八卦大區塊鳥瞰文字（讓鳥瞰圖跟海報一樣清晰！）
   const ringLabels = useMemo(() => {
@@ -742,20 +830,85 @@ export function MandalaRing3D() {
         />
       </mesh>
 
-      {/* 直接繪製於地板頂面的曼陀羅貼圖（與實心底盤拉開 0.16m 深度間距，鳥瞰零破圖） */}
-      {floorTexture && (
-        <mesh
-          rotation={[-Math.PI / 2, 0, 0]}
-          position={[0, config.floorY, 0]}
-          receiveShadow
-        >
-          <circleGeometry args={[discRadius, 128]} />
-          {isLight ? (
-            <meshBasicMaterial map={floorTexture} toneMapped={false} />
-          ) : (
-            <meshStandardMaterial map={floorTexture} roughness={0.88} metalness={0.02} />
-          )}
+      {/* 純向量地板底面（零像素貼圖，任意距離皆刀鋒銳利） */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, config.floorY, 0]} receiveShadow>
+        <circleGeometry args={[discRadius, 128]} />
+        {isLight ? (
+          <meshBasicMaterial color={config.colorFloorLight} toneMapped={false} />
+        ) : (
+          <meshStandardMaterial color="#0c1324" roughness={0.88} metalness={0.02} />
+        )}
+      </mesh>
+
+      {/* 向量層 1：有定義閘門柔和走廊底色 */}
+      {vectorFloor.activeBgGeom && (
+        <mesh geometry={vectorFloor.activeBgGeom} position={[0, config.floorY + 0.008, 0]}>
+          <meshBasicMaterial
+            color={isLight ? config.colorActiveGateBg : '#fcf2e4'}
+            transparent={!isLight}
+            opacity={isLight ? 1 : 0.14}
+            side={THREE.DoubleSide}
+            toneMapped={false}
+          />
         </mesh>
+      )}
+
+      {/* 向量層 2：6 圈 384 爻線小色塊（頂點色單 Draw Call） */}
+      {vectorFloor.lineBlocksGeom && (
+        <mesh geometry={vectorFloor.lineBlocksGeom} position={[0, config.floorY + 0.016, 0]}>
+          <meshBasicMaterial vertexColors side={THREE.DoubleSide} toneMapped={false} />
+        </mesh>
+      )}
+
+      {/* 向量層 3：384 條 6 等分爻線細刻度 */}
+      {vectorFloor.fineTicksGeom && (
+        <mesh geometry={vectorFloor.fineTicksGeom} position={[0, config.floorY + 0.024, 0]}>
+          <meshBasicMaterial
+            color={isLight ? '#64748b' : '#94a3b8'}
+            transparent
+            opacity={isLight ? 0.5 : 0.34}
+            side={THREE.DoubleSide}
+            toneMapped={false}
+          />
+        </mesh>
+      )}
+
+      {/* 向量層 4：14 圈同心圓與 4/8/12/16/64 切塊主分割線 */}
+      {vectorFloor.mainLinesGeom && (
+        <mesh geometry={vectorFloor.mainLinesGeom} position={[0, config.floorY + 0.032, 0]}>
+          <meshBasicMaterial
+            color={isLight ? config.colorGridStroke : '#94a3b8'}
+            transparent={!isLight}
+            opacity={isLight ? 1 : 0.5}
+            side={THREE.DoubleSide}
+            toneMapped={false}
+          />
+        </mesh>
+      )}
+
+      {/* 向量層 5：3D 啟動星體符號（地球採純向量無縫十字圓環；其餘採 MSDF 向量字型） */}
+      {vectorFloor.planetItems.map((item) =>
+        item.body === 'Earth' ? (
+          <VectorEarthSymbol
+            key={item.key}
+            position={[item.x, config.floorY + 0.044, item.z]}
+            color={item.color}
+            radius={0.62}
+          />
+        ) : (
+          <Text
+            key={item.key}
+            position={[item.x, config.floorY + 0.044, item.z]}
+            rotation={[-Math.PI / 2, 0, 0]}
+            fontSize={1.55}
+            color={item.color}
+            anchorX="center"
+            anchorY="middle"
+            fontWeight={700}
+          >
+            {item.sym}
+          </Text>
+        )
       )}
 
       {/* 鳥瞰圖象限／神格／星座／八卦環文字（最低 Y=0.6 防陷進地板） */}

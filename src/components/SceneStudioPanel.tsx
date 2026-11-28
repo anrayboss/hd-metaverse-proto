@@ -125,7 +125,10 @@ const PALETTE_KEYS = [
 ] as const;
 
 type PaletteKey = (typeof PALETTE_KEYS)[number];
-type StudioNumericKey = Exclude<keyof SceneConfig, PaletteKey | 'gateDigitOffsets'>;
+type StudioNumericKey = Exclude<
+  keyof SceneConfig,
+  PaletteKey | 'gateDigitOffsets' | 'rootSideChannelOffsetZ'
+>;
 
 interface ParamSpec {
   min: number;
@@ -176,7 +179,7 @@ const STUDIO_PARAM_SPECS: Record<StudioNumericKey, ParamSpec> = {
   channelPulseSpeed: { min: 0.05, max: 2.0, step: 0.05, label: '微中子流速' },
   channelRingOpacity: { min: 0, max: 1, step: 0.02, label: '管內導光環濃度' },
   junctionSphereRadius: { min: 0.1, max: 0.9, step: 0.02, label: '34/10 匯流點半徑' },
-  rootSideChannelOffsetZ: { min: -3.0, max: 3.0, step: 0.05, label: '根部側6管位移 Z' },
+  throatTopChannelOffsetZ: { min: -3.0, max: 3.0, step: 0.05, label: '16/35 閘門管子位移 Z' },
   // 1/64 閘門走廊
   corridorWallHeight: { min: 2, max: 14, step: 0.2, label: '透明牆高度' },
   corridorWallOpacity: { min: 0.02, max: 0.6, step: 0.02, label: '透明牆濃度' },
@@ -253,7 +256,6 @@ export function SceneStudioPanel() {
   const exitInteriorSpace = useWorldStore((s) => s.exitInteriorSpace);
   const setConfig = useSceneConfigStore((s) => s.setConfig);
   const setShowRuler = useSceneConfigStore((s) => s.setShowRuler);
-  const setEditGateDigits = useSceneConfigStore((s) => s.setEditGateDigits);
   const hoveredRuler = useSceneConfigStore((s) => s.hoveredRuler);
   const saveToLocalFile = useSceneConfigStore((s) => s.saveToLocalFile);
   const saveStatus = useSceneConfigStore((s) => s.saveStatus);
@@ -271,7 +273,6 @@ export function SceneStudioPanel() {
   const [studioValues, setStudio] = useControls(
     () => ({
       showRuler: { value: false, label: '📏 顯示尺規 (懸停長寬高)' },
-      editGateDigits: { value: false, label: '✋ 拖曳調整閘門數字位置' },
       '介面字體': folder(
         {
           studioFontSize: numCtrl('studioFontSize'),
@@ -322,7 +323,7 @@ export function SceneStudioPanel() {
           channelPulseSpeed: numCtrl('channelPulseSpeed'),
           channelRingOpacity: numCtrl('channelRingOpacity'),
           junctionSphereRadius: numCtrl('junctionSphereRadius'),
-          rootSideChannelOffsetZ: numCtrl('rootSideChannelOffsetZ'),
+          throatTopChannelOffsetZ: numCtrl('throatTopChannelOffsetZ'),
         },
         { collapsed: true }
       ),
@@ -385,10 +386,9 @@ export function SceneStudioPanel() {
       '↩️ 重設回已儲存數值': button(() => {
         const saved = useSceneConfigStore.getState().savedConfig;
         const savedStudio = pickStudioValues(saved);
-        setStudio({ ...savedStudio, showRuler: false, editGateDigits: false });
+        setStudio({ ...savedStudio, showRuler: false });
         setConfig({ ...savedStudio, gateDigitOffsets: { ...saved.gateDigitOffsets } });
         setShowRuler(false);
-        setEditGateDigits(false);
         useSceneConfigStore.setState({ saveStatus: '↩️ 已重設回已儲存數值' });
         setTimeout(() => useSceneConfigStore.setState({ saveStatus: '' }), 2200);
       }),
@@ -453,7 +453,7 @@ export function SceneStudioPanel() {
   );
 
   useEffect(() => {
-    const { showRuler, editGateDigits, ...sceneValues } = studioValues;
+    const { showRuler, ...sceneValues } = studioValues;
     // 安全 clamp，避免手動鍵盤輸入或拖曳超出合理區間
     const clamped: Partial<SceneConfig> = {};
     for (const k of STUDIO_NUMERIC_KEYS) {
@@ -465,8 +465,7 @@ export function SceneStudioPanel() {
     }
     setConfig(clamped);
     setShowRuler(showRuler);
-    setEditGateDigits(editGateDigits);
-  }, [studioValues, setConfig, setShowRuler, setEditGateDigits]);
+  }, [studioValues, setConfig, setShowRuler]);
 
   useEffect(() => {
     setConfig(paletteValues);

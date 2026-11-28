@@ -43,6 +43,7 @@ export interface SceneConfig {
   channelRingOpacity: number;
   junctionSphereRadius: number;
   rootSideChannelOffsetZ: number;
+  throatTopChannelOffsetZ: number;
   // 微中子流場
   neutrinoPointSize: number;
   neutrinoOpacity: number;

@@ -38,6 +38,9 @@ const CORNER_TIGHT_GATES = new Set([30, 36, 18, 48]);
 /** 根中心左右兩側 6 條通道端點（58/41/38/54/39/19），同步沿鳥瞰下方（+Z）平移並保持通道連接 */
 const ROOT_SIDE_SHIFT_GATES = new Set([58, 41, 38, 54, 39, 19]);
 
+/** 喉嚨左右上角 16、35 閘門通道端點，可由調參面板調整 Z 軸位移並保持通道連接 */
+const THROAT_TOP_SHIFT_GATES = new Set([16, 35]);
+
 /** 三角形中心（較窄尖角），閘門數字需較大幅度往中心內縮避免超出邊界 */
 const TRIANGLE_CENTERS = new Set<CenterId>(['head', 'ajna', 'ego', 'solar', 'spleen']);
 
@@ -946,15 +949,16 @@ function SplineAtriumBodyGraph({
       {standardChannels.map((ch) => {
         const rawS = gatePositions[ch.gates[0]];
         const rawE = gatePositions[ch.gates[1]];
-        const dz = config.rootSideChannelOffsetZ ?? 0;
-        const s =
-          dz !== 0 && ROOT_SIDE_SHIFT_GATES.has(ch.gates[0])
-            ? new THREE.Vector3(rawS.x, rawS.y, rawS.z + dz)
-            : rawS;
-        const e =
-          dz !== 0 && ROOT_SIDE_SHIFT_GATES.has(ch.gates[1])
-            ? new THREE.Vector3(rawE.x, rawE.y, rawE.z + dz)
-            : rawE;
+        const rootDz = config.rootSideChannelOffsetZ ?? 0;
+        const throatDz = config.throatTopChannelOffsetZ ?? 0;
+        const shiftEndpoint = (gateNum: number, pt: THREE.Vector3) => {
+          let dz = 0;
+          if (ROOT_SIDE_SHIFT_GATES.has(gateNum)) dz += rootDz;
+          if (THROAT_TOP_SHIFT_GATES.has(gateNum)) dz += throatDz;
+          return dz !== 0 ? new THREE.Vector3(pt.x, pt.y, pt.z + dz) : pt;
+        };
+        const s = shiftEndpoint(ch.gates[0], rawS);
+        const e = shiftEndpoint(ch.gates[1], rawE);
         const extStart = CORNER_TIGHT_GATES.has(ch.gates[0]) ? -0.14 : 0.35;
         const extEnd = CORNER_TIGHT_GATES.has(ch.gates[1]) ? -0.14 : 0.35;
         return (
