@@ -84,6 +84,7 @@ export interface SceneConfig {
   colorCircleUndefined: string;
   colorChannelActive: string;
   colorChannelInactive: string;
+  colorBodyGraphCenterDefined: string;
   colorBodyGraphGateDefined: string;
   colorBodyGraphGateUndefined: string;
   colorCenterHead: string;

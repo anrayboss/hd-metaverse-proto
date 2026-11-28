@@ -72,6 +72,7 @@
   "colorCircleUndefined": "#f2ba78",
   "colorChannelActive": "#ffaf52",
   "colorChannelInactive": "#cbd5e1",
+  "colorBodyGraphCenterDefined": "#ffaf52",
   "colorBodyGraphGateDefined": "#222222",
   "colorBodyGraphGateUndefined": "#94a3b8",
   "colorCenterHead": "#8b6dae",

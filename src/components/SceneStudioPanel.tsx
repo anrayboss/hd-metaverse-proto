@@ -107,6 +107,7 @@ const PALETTE_KEYS = [
   'colorCircleUndefined',
   'colorChannelActive',
   'colorChannelInactive',
+  'colorBodyGraphCenterDefined',
   'colorBodyGraphGateDefined',
   'colorBodyGraphGateUndefined',
   'colorCenterHead',
@@ -410,6 +411,10 @@ export function SceneStudioPanel() {
           colorCircleUndefined: { value: DEFAULT_SCENE_CONFIG.colorCircleUndefined, label: '2D 空白閘門圈' },
           colorChannelActive: { value: DEFAULT_SCENE_CONFIG.colorChannelActive, label: '3D 啟動通道色' },
           colorChannelInactive: { value: DEFAULT_SCENE_CONFIG.colorChannelInactive, label: '3D 空白通道色' },
+          colorBodyGraphCenterDefined: {
+            value: DEFAULT_SCENE_CONFIG.colorBodyGraphCenterDefined,
+            label: '3D 定義中心色',
+          },
           colorBodyGraphGateDefined: { value: DEFAULT_SCENE_CONFIG.colorBodyGraphGateDefined, label: '3D 定義閘門數字色 (備用)' },
           colorBodyGraphGateUndefined: { value: DEFAULT_SCENE_CONFIG.colorBodyGraphGateUndefined, label: '3D 人體圖閘門數字色' },
         },
