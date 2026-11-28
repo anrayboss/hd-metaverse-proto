@@ -36,7 +36,7 @@
   "channelRingOpacity": 0.28,
   "junctionSphereRadius": 0.15,
   "rootSideChannelOffsetZ": 0.15000000000000022,
-  "throatTopChannelOffsetZ": 0,
+  "throatTopChannelOffsetZ": -0.5,
   "neutrinoPointSize": 0.32,
   "neutrinoOpacity": 0.35,
   "neutrinoRotSpeed": 0.015,

@@ -32,9 +32,6 @@ const CENTER_NAME_TO_ID: Record<string, CenterId> = {
 /** 整合迴路 5 條分支通道（改由 34、10 匯流至 57-20 主幹線，不再拉 6 條交叉直線） */
 const INTEGRATION_BRANCH_IDS = new Set(['10-20', '34-20', '34-10', '57-10', '34-57']);
 
-/** 位於脾臟／情緒三角形尖角附近的閘門，管線端點內縮避免戳穿中心房間 */
-const CORNER_TIGHT_GATES = new Set([30, 36, 18, 48]);
-
 /** 根中心左右兩側 6 條通道端點（58/41/38/54/39/19），同步沿鳥瞰下方（+Z）平移並保持通道連接 */
 const ROOT_SIDE_SHIFT_GATES = new Set([58, 41, 38, 54, 39, 19]);
 
@@ -58,7 +55,42 @@ function projectPointToSegment(
 }
 
 /**
- * 單條可進入的中空 3D 通道管（openEnded + DoubleSide 內壁 + 內壁導光環，點擊可進入管線內部）
+ * 將通道端點以 Raycaster 精準裁切至目標能量中心外牆表面：
+ * - 從通道中點（位於中心外部）朝端點方向射出射線，命中中心外牆即截斷
+ * - 確保外部看完全貼齊中心外牆，走進中心內部房間則 100% 乾淨零管子突刺
+ */
+function clipEndpointToCenterWall(
+  midLocal: THREE.Vector3,
+  endLocal: THREE.Vector3,
+  modelRoot: THREE.Object3D,
+  centerMeshes?: THREE.Mesh[]
+): THREE.Vector3 {
+  if (!centerMeshes || centerMeshes.length === 0) return endLocal;
+
+  modelRoot.updateMatrixWorld(true);
+  const midWorld = midLocal.clone();
+  const endWorld = endLocal.clone();
+  modelRoot.localToWorld(midWorld);
+  modelRoot.localToWorld(endWorld);
+
+  const vec = endWorld.clone().sub(midWorld);
+  const totalDist = vec.length();
+  if (totalDist < 1e-4) return endLocal;
+  const dir = vec.divideScalar(totalDist);
+
+  const raycaster = new THREE.Raycaster(midWorld, dir, 0, totalDist + 0.5);
+  const hits = raycaster.intersectObjects(centerMeshes, false);
+  if (hits.length === 0) return endLocal;
+
+  // 第一個命中點即中心最外側牆面；微嵌入 0.008 防止貼牆微縫，同時絕不突入房間內部
+  const hitWorld = hits[0].point.clone().addScaledVector(dir, 0.008);
+  const hitLocal = hitWorld.clone();
+  modelRoot.worldToLocal(hitLocal);
+  return hitLocal;
+}
+
+/**
+ * 單條可進入的中空 3D 通道管（openEnded + DoubleSide 內壁，兩端精準切齊九中心外牆）
  */
 function ChannelConduit({
   channelId,
@@ -70,8 +102,8 @@ function ChannelConduit({
   activeB,
   isLight,
   isInInterior,
-  extendStart = 0.35,
-  extendEnd = 0.35,
+  extendStart = 0,
+  extendEnd = 0,
   onSelectChannel,
 }: {
   channelId: string;
@@ -92,10 +124,9 @@ function ChannelConduit({
   const editGateDigits = useSceneConfigStore((s) => s.editGateDigits);
   const bothActive = activeA && activeB;
 
-  const { segA, segB, dir, length, ringPositions, fullQuat, extStart } = useMemo(() => {
+  const { segA, segB, dir, length, extStart } = useMemo(() => {
     const rawVec = end.clone().sub(start);
     const d = rawVec.clone().normalize();
-    // 兩端往中心內部微幅延伸，讓中空通道管線與九中心留空空間無縫連通
     const sPt = start.clone().addScaledVector(d, -extendStart);
     const ePt = end.clone().addScaledVector(d, extendEnd);
     const mid = sPt.clone().add(ePt).multiplyScalar(0.5);
@@ -111,22 +142,12 @@ function ChannelConduit({
     };
     const fullVec = ePt.clone().sub(sPt);
     const len = fullVec.length();
-    const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), d);
-
-    // 管內導光環（讓攝影機在中心與通道間穿梭時清楚辨識連通空間）
-    const ringCount = Math.max(2, Math.min(7, Math.floor(len / 1.4)));
-    const rings: THREE.Vector3[] = [];
-    for (let i = 1; i <= ringCount; i++) {
-      rings.push(sPt.clone().addScaledVector(d, (len * i) / (ringCount + 1)));
-    }
 
     return {
       segA: buildSeg(sPt, mid),
       segB: buildSeg(mid, ePt),
       dir: d,
       length: len,
-      ringPositions: rings,
-      fullQuat: quat,
       extStart: sPt,
     };
   }, [start, end, extendStart, extendEnd]);
@@ -194,18 +215,6 @@ function ChannelConduit({
           opacity={isInInterior ? config.centerInteriorOpacity : 1}
         />
       </mesh>
-
-      {/* 管線內部結構導光環（攝影機進入內部時清晰可見空間尺度） */}
-      {ringPositions.map((rp, idx) => (
-        <mesh key={idx} position={rp} quaternion={fullQuat}>
-          <torusGeometry args={[radius * 0.92, 0.018, 8, 24]} />
-          <meshBasicMaterial
-            color={bothActive ? '#fef08a' : isLight ? '#0284c7' : '#7dd3fc'}
-            transparent
-            opacity={isInInterior ? Math.max(0.6, config.channelRingOpacity) : config.channelRingOpacity}
-          />
-        </mesh>
-      ))}
 
       {/* 能量微中子光點沿通道流動 */}
       <mesh ref={pulseRef}>
@@ -666,7 +675,7 @@ function SplineAtriumBodyGraph({
   const editGateDigits = useSceneConfigStore((s) => s.editGateDigits);
   const centerMap = useMemo(() => Object.fromEntries(CENTERS.map((c) => [c.id, c])), []);
 
-  const { modelRoot, gatePositions, centerPositions, centerTopYs } = useMemo(() => {
+  const { modelRoot, gatePositions, centerPositions, centerTopYs, centerMeshes } = useMemo(() => {
     const cloned = scene.clone(true);
     cloned.updateMatrixWorld(true);
 
@@ -693,16 +702,23 @@ function SplineAtriumBodyGraph({
     const gates: Record<number, THREE.Vector3> = {};
     const centers: Partial<Record<CenterId, THREE.Vector3>> = {};
     const topYs: Partial<Record<CenterId, number>> = {};
+    const meshesByCenter: Partial<Record<CenterId, THREE.Mesh[]>> = {};
 
     cloned.traverse((obj) => {
       const mesh = obj as THREE.Mesh;
       if (!mesh.isMesh) return;
 
-      // 複製獨立材質，避免修改共享 material 互相污染
+      // 複製獨立材質，避免修改共享 material 互相污染，並預先設 DoubleSide 供 Raycaster 命中外牆
       if (Array.isArray(mesh.material)) {
-        mesh.material = mesh.material.map((m) => m.clone());
+        mesh.material = mesh.material.map((m) => {
+          const c = m.clone();
+          c.side = THREE.DoubleSide;
+          return c;
+        });
       } else if (mesh.material) {
-        mesh.material = mesh.material.clone();
+        const c = mesh.material.clone();
+        c.side = THREE.DoubleSide;
+        mesh.material = c;
       }
 
       const lower = mesh.name.toLowerCase();
@@ -715,6 +731,8 @@ function SplineAtriumBodyGraph({
         box.getCenter(pos);
         centers[centerId] = pos;
         topYs[centerId] = Math.max(topYs[centerId] ?? -Infinity, box.max.y);
+        if (!meshesByCenter[centerId]) meshesByCenter[centerId] = [];
+        meshesByCenter[centerId]!.push(mesh);
         return;
       }
 
@@ -726,12 +744,18 @@ function SplineAtriumBodyGraph({
         const pos = new THREE.Vector3();
         box.getCenter(pos);
         gates[gateNum] = pos;
-        // 閘門定位方塊僅用於拉通道與取得水平座標，渲染時隱藏改由中心頂面立體數字呈現
+        // 閘門定位方塊僅用於拉通道與取得水平座標，渲染時隱藏改由中心頂面平面數字呈現
         mesh.visible = false;
       }
     });
 
-    return { modelRoot: wrapper, gatePositions: gates, centerPositions: centers, centerTopYs: topYs };
+    return {
+      modelRoot: wrapper,
+      gatePositions: gates,
+      centerPositions: centers,
+      centerTopYs: topYs,
+      centerMeshes: meshesByCenter,
+    };
   }, [scene]);
 
   // 依據定義中心與啟動閘門即時更新 GLB 材質顏色（定義中心統一用 #f2ba79 / colorDesign，無定義用純白）
@@ -945,7 +969,7 @@ function SplineAtriumBodyGraph({
         />
       )}
 
-      {/* 一般通道中空管線（與九中心連通，點擊可選中並進入人體圖內部空間） */}
+      {/* 一般通道中空管線（兩端以 Raycaster 精準切齊九中心外牆，房間內部零管子突刺） */}
       {standardChannels.map((ch) => {
         const rawS = gatePositions[ch.gates[0]];
         const rawE = gatePositions[ch.gates[1]];
@@ -957,10 +981,23 @@ function SplineAtriumBodyGraph({
           if (THROAT_TOP_SHIFT_GATES.has(gateNum)) dz += throatDz;
           return dz !== 0 ? new THREE.Vector3(pt.x, pt.y, pt.z + dz) : pt;
         };
-        const s = shiftEndpoint(ch.gates[0], rawS);
-        const e = shiftEndpoint(ch.gates[1], rawE);
-        const extStart = CORNER_TIGHT_GATES.has(ch.gates[0]) ? -0.14 : 0.35;
-        const extEnd = CORNER_TIGHT_GATES.has(ch.gates[1]) ? -0.14 : 0.35;
+        const shiftedS = shiftEndpoint(ch.gates[0], rawS);
+        const shiftedE = shiftEndpoint(ch.gates[1], rawE);
+        const mid = shiftedS.clone().add(shiftedE).multiplyScalar(0.5);
+        const startCenterId = GATE_BY_NUMBER[ch.gates[0]]?.centerId;
+        const endCenterId = GATE_BY_NUMBER[ch.gates[1]]?.centerId;
+        const s = clipEndpointToCenterWall(
+          mid,
+          shiftedS,
+          modelRoot,
+          startCenterId ? centerMeshes[startCenterId] : undefined
+        );
+        const e = clipEndpointToCenterWall(
+          mid,
+          shiftedE,
+          modelRoot,
+          endCenterId ? centerMeshes[endCenterId] : undefined
+        );
         return (
           <ChannelConduit
             key={ch.id}
@@ -973,8 +1010,8 @@ function SplineAtriumBodyGraph({
             activeB={activeGates.includes(ch.gates[1])}
             isLight={isLight}
             isInInterior={isInInterior}
-            extendStart={extStart}
-            extendEnd={extEnd}
+            extendStart={0}
+            extendEnd={0}
             onSelectChannel={() =>
               onSelectChannel(
                 ch.id,
@@ -989,46 +1026,55 @@ function SplineAtriumBodyGraph({
         );
       })}
 
-      {/* 整合迴路特殊接線：34 與 10（朝 9 點鐘水平延伸）連接至 57-20 主幹線 */}
-      {integrationBranches.map((br) => (
-        <group key={br.id}>
-          <ChannelConduit
-            channelId={br.id}
-            channelName={br.name}
-            gates={br.gates}
-            start={br.start}
-            end={br.end}
-            activeA={br.activeA}
-            activeB={br.activeB}
-            isLight={isLight}
-            isInInterior={isInInterior}
-            extendStart={0.35}
-            extendEnd={0}
-            onSelectChannel={() =>
-              onSelectChannel(
-                br.id,
-                br.name,
-                br.description,
-                br.gates,
-                toWorldTuple(br.start),
-                toWorldTuple(br.end)
-              )
-            }
-          />
-          {/* 匯流點中空接頭環 */}
-          <mesh position={br.end}>
-            <sphereGeometry args={[config.junctionSphereRadius, 14, 14]} />
-            <meshStandardMaterial
-              color={br.activeA ? config.colorChannelActive : isLight ? config.colorChannelInactive : '#475569'}
-              emissive={br.activeA ? config.colorChannelActive : '#0f172a'}
-              emissiveIntensity={br.activeA ? 0.65 : 0.1}
-              side={THREE.DoubleSide}
-              transparent={isInInterior}
-              opacity={isInInterior ? config.centerInteriorOpacity : 1}
+      {/* 整合迴路特殊接線：34 與 10（起點切齊薦骨／自性外牆，終點接 57-20 主幹線匯流點） */}
+      {integrationBranches.map((br) => {
+        const startCenterId = GATE_BY_NUMBER[br.gates[0]]?.centerId;
+        const clippedStart = clipEndpointToCenterWall(
+          br.end,
+          br.start,
+          modelRoot,
+          startCenterId ? centerMeshes[startCenterId] : undefined
+        );
+        return (
+          <group key={br.id}>
+            <ChannelConduit
+              channelId={br.id}
+              channelName={br.name}
+              gates={br.gates}
+              start={clippedStart}
+              end={br.end}
+              activeA={br.activeA}
+              activeB={br.activeB}
+              isLight={isLight}
+              isInInterior={isInInterior}
+              extendStart={0}
+              extendEnd={0}
+              onSelectChannel={() =>
+                onSelectChannel(
+                  br.id,
+                  br.name,
+                  br.description,
+                  br.gates,
+                  toWorldTuple(clippedStart),
+                  toWorldTuple(br.end)
+                )
+              }
             />
-          </mesh>
-        </group>
-      ))}
+            {/* 匯流點中空接頭環 */}
+            <mesh position={br.end}>
+              <sphereGeometry args={[config.junctionSphereRadius, 14, 14]} />
+              <meshStandardMaterial
+                color={br.activeA ? config.colorChannelActive : isLight ? config.colorChannelInactive : '#475569'}
+                emissive={br.activeA ? config.colorChannelActive : '#0f172a'}
+                emissiveIntensity={br.activeA ? 0.65 : 0.1}
+                side={THREE.DoubleSide}
+                transparent={isInInterior}
+                opacity={isInInterior ? config.centerInteriorOpacity : 1}
+              />
+            </mesh>
+          </group>
+        );
+      })}
 
       {/* 3D 曼陀羅四箭頭（Variables）：位置對齊 2D 本命圖（頭頂與邏輯中心兩側） */}
       {variables.length > 0 && (
